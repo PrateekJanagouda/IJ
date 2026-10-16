@@ -1,0 +1,50 @@
+# Local development stack. Not a production deployment.
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: eqora
+      POSTGRES_USER: eqora
+      POSTGRES_PASSWORD: eqora
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eqora"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+
+  backend:
+    build: ./backend
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+      REDIS_URL: redis://redis:6379/0
+      OUTBOX_DISPATCH: celery
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+    volumes: ["./backend:/app"]
+    ports: ["8000:8000"]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_started}
+
+  worker:
+    build: ./backend
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+      REDIS_URL: redis://redis:6379/0
+      OUTBOX_DISPATCH: celery
+    command: celery -A config worker --beat --loglevel=info
+    volumes: ["./backend:/app"]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_started}
+
+volumes:
+  pgdata:

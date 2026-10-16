@@ -1,0 +1,36 @@
+from django.urls import path
+
+from . import views as v
+
+urlpatterns = [
+    path("events/", v.EventListView.as_view()),
+    path("events/managed/", v.ManagedEventListView.as_view()),
+    path("events/<uuid:event_id>/", v.EventDetailView.as_view()),
+    path("events/<uuid:event_id>/publish/", v.EventPublishView.as_view()),
+    path("events/<uuid:event_id>/cancel/", v.EventCancelView.as_view()),
+    path("events/<uuid:event_id>/complete/", v.EventCompleteView.as_view()),
+    path("events/<uuid:event_id>/opportunities/", v.EventOpportunitiesView.as_view()),
+    path("events/<uuid:event_id>/lineup/", v.EventLineupView.as_view()),
+    path("opportunities/", v.OpportunityListView.as_view()),
+    path("opportunities/managed/", v.ManagedOpportunityListView.as_view()),
+    path("opportunities/<uuid:opportunity_id>/", v.OpportunityDetailView.as_view()),
+    path("opportunities/<uuid:opportunity_id>/publish/", v.OpportunityPublishView.as_view()),
+    path("opportunities/<uuid:opportunity_id>/close/", v.OpportunityCloseView.as_view()),
+    path("opportunities/<uuid:opportunity_id>/cancel/", v.OpportunityCancelView.as_view()),
+    path("opportunities/<uuid:opportunity_id>/complete/", v.OpportunityCompleteView.as_view()),
+    path("opportunities/<uuid:opportunity_id>/applications/",
+         v.OpportunityApplicationsView.as_view()),
+    path("opportunities/<uuid:opportunity_id>/bookings/", v.OpportunityBookingsView.as_view()),
+    path("applications/mine/", v.MyApplicationsView.as_view()),
+    path("applications/<uuid:application_id>/", v.ApplicationDetailView.as_view()),
+    path("applications/<uuid:application_id>/history/", v.ApplicationHistoryView.as_view()),
+    path("applications/<uuid:application_id>/shortlist/", v.ApplicationShortlistView.as_view()),
+    path("applications/<uuid:application_id>/accept/", v.ApplicationAcceptView.as_view()),
+    path("applications/<uuid:application_id>/decline/", v.ApplicationDeclineView.as_view()),
+    path("applications/<uuid:application_id>/withdraw/", v.ApplicationWithdrawView.as_view()),
+    path("bookings/mine/", v.MyBookingsView.as_view()),
+    path("bookings/<uuid:booking_id>/cancel/", v.BookingCancelView.as_view()),
+    path("bookings/<uuid:booking_id>/complete/", v.BookingCompleteView.as_view()),
+    path("bookings/<uuid:booking_id>/no-show/", v.BookingNoShowView.as_view()),
+    path("metrics/funnel/", v.FunnelMetricsView.as_view()),
+]
