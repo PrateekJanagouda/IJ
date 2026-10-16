@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: EQora API
+  title: EQura API
   version: 1.0.0
   description: Artist network and gig marketplace API (v1).
 paths:

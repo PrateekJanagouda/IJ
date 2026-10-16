@@ -1,4 +1,4 @@
-# EQora Architecture (Hour 3)
+# EQura Architecture (Hour 3)
 
 **Status:** Initial architecture decision  
 **Approach:** Modular monolith  
@@ -9,7 +9,7 @@
 
 ## 1. Architecture decision
 
-EQora will begin as a **modular monolith**: one primary backend application, organized into domain modules with explicit boundaries. Modules live in the same codebase and deploy together, but each module owns its business rules and public interfaces.
+EQura will begin as a **modular monolith**: one primary backend application, organized into domain modules with explicit boundaries. Modules live in the same codebase and deploy together, but each module owns its business rules and public interfaces.
 
 This is preferable to starting with microservices because the initial product needs coordinated workflows across identity, social activity, messaging, events, opportunities, applications, and notifications. A modular monolith keeps local development, transactions, deployment, and debugging manageable while preserving a path to extract modules later if measured needs justify it.
 
@@ -134,7 +134,7 @@ A module owns its models and business rules. Other modules should call its publi
 ## 6. Initial repository layout
 
 ```text
-EQora/
+EQura/
 ├── frontend/                 # Next.js application
 ├── backend/
 │   ├── config/               # Django settings, URLs, ASGI/WSGI, Celery config

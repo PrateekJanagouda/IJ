@@ -14,12 +14,12 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: eqora
-          POSTGRES_USER: eqora
-          POSTGRES_PASSWORD: eqora
+          POSTGRES_DB: equra
+          POSTGRES_USER: equra
+          POSTGRES_PASSWORD: equra
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U eqora" --health-interval 5s --health-retries 10
+          --health-cmd "pg_isready -U equra" --health-interval 5s --health-retries 10
     env:
       POSTGRES_HOST: localhost
     steps:

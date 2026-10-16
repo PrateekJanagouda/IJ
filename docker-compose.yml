@@ -3,13 +3,13 @@ services:
   db:
     image: postgres:16
     environment:
-      POSTGRES_DB: eqora
-      POSTGRES_USER: eqora
-      POSTGRES_PASSWORD: eqora
+      POSTGRES_DB: equra
+      POSTGRES_USER: equra
+      POSTGRES_PASSWORD: equra
     ports: ["5432:5432"]
     volumes: [pgdata:/var/lib/postgresql/data]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U eqora"]
+      test: ["CMD-SHELL", "pg_isready -U equra"]
       interval: 5s
       retries: 10
 

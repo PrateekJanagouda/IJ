@@ -1,4 +1,4 @@
-"""EQora Django settings.
+"""EQura Django settings.
 
 Configuration comes from environment variables (see `.env.example`). Production-unsafe
 defaults are only used when DJANGO_DEBUG=true.
@@ -94,9 +94,9 @@ TEMPLATES = [
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": env("POSTGRES_DB", "eqora"),
-        "USER": env("POSTGRES_USER", "eqora"),
-        "PASSWORD": env("POSTGRES_PASSWORD", "eqora"),
+        "NAME": env("POSTGRES_DB", "equra"),
+        "USER": env("POSTGRES_USER", "equra"),
+        "PASSWORD": env("POSTGRES_PASSWORD", "equra"),
         "HOST": env("POSTGRES_HOST", "localhost"),
         "PORT": env("POSTGRES_PORT", "5432"),
         "CONN_MAX_AGE": int(env("POSTGRES_CONN_MAX_AGE", "60")),
@@ -157,7 +157,7 @@ if not DEBUG:
 
 # --- Email -------------------------------------------------------------------
 EMAIL_BACKEND = env("DJANGO_EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
-DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "no-reply@eqora.local")
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "no-reply@equra.local")
 PASSWORD_RESET_TIMEOUT = int(timedelta(hours=1).total_seconds())
 
 # --- REST framework ----------------------------------------------------------
@@ -195,7 +195,7 @@ if DEBUG:
 
 EXPOSE_API_DOCS = env_bool("EXPOSE_API_DOCS", DEBUG)
 SPECTACULAR_SETTINGS = {
-    "TITLE": "EQora API",
+    "TITLE": "EQura API",
     "DESCRIPTION": "Artist network and gig marketplace API (v1).",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,

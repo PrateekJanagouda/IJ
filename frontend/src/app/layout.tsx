@@ -4,9 +4,9 @@ import { AuthProvider } from "@/lib/auth";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "EQora — every artist deserves a stage",
+  title: "EQura — every artist deserves a stage",
   description: "Find gigs, book performers and grow your live-music network.",
-  appleWebApp: { capable: true, title: "EQora", statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: "EQura", statusBarStyle: "black-translucent" },
 };
 
 export const viewport: Viewport = {

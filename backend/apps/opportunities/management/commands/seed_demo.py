@@ -21,14 +21,14 @@ from apps.outbox.services import process_pending
 from apps.profiles import services as profiles
 from apps.social import services as social
 
-PASSWORD = "eqora-demo-2026"
+PASSWORD = "equra-demo-2026"
 
 
 class Command(BaseCommand):
     help = "Create fictional demo users, gigs, applications, posts and messages."
 
     def handle(self, *args, **options):
-        if User.objects.filter(email="asha@demo.eqora").exists():
+        if User.objects.filter(email="asha@demo.equra").exists():
             self.stdout.write("Demo data already present.")
             return self._print_logins()
         with transaction.atomic():
@@ -38,8 +38,8 @@ class Command(BaseCommand):
         self._print_logins()
 
     def _print_logins(self):
-        self.stdout.write(f"  artist:    asha@demo.eqora / {PASSWORD}")
-        self.stdout.write(f"  organizer: olivia@demo.eqora / {PASSWORD}")
+        self.stdout.write(f"  artist:    asha@demo.equra / {PASSWORD}")
+        self.stdout.write(f"  organizer: olivia@demo.equra / {PASSWORD}")
 
     def _user(self, email, name, roles, profile, artist=None, organizer=None):
         user = identity.register_user(email=email, password=PASSWORD, display_name=name, roles=roles)
@@ -54,7 +54,7 @@ class Command(BaseCommand):
         )
 
         asha = self._user(
-            "asha@demo.eqora", "Asha Rao", ["artist"],
+            "asha@demo.equra", "Asha Rao", ["artist"],
             {"headline": "Indie-folk singer-songwriter", "location_label": "Bengaluru",
              "bio": "Writing songs about monsoons and metro rides. Guitar + loop pedal. "
                     "Two EPs out, always up for an open mic."},
@@ -68,23 +68,23 @@ class Command(BaseCommand):
         profiles.add_portfolio_item(asha, {"title": "Metro Lines EP",
                                            "url": "https://soundcloud.com/demo/metro-lines",
                                            "item_type": "audio"})
-        kabir = self._user("kabir@demo.eqora", "Kabir Sethi", ["artist"],
+        kabir = self._user("kabir@demo.equra", "Kabir Sethi", ["artist"],
                            {"headline": "House & disco DJ", "location_label": "Mumbai"},
                            artist={"genres": ["electronic"], "skills": ["djing", "music-production"]})
-        meera = self._user("meera@demo.eqora", "Meera Iyer", ["artist"],
+        meera = self._user("meera@demo.equra", "Meera Iyer", ["artist"],
                            {"headline": "Jazz vocalist · standards & originals",
                             "location_label": "Bengaluru"},
                            artist={"genres": ["jazz", "soul"], "skills": ["singing"]})
-        dev = self._user("dev@demo.eqora", "Dev & The Dusk", ["artist"],
+        dev = self._user("dev@demo.equra", "Dev & The Dusk", ["artist"],
                          {"headline": "Four-piece alt-rock band", "location_label": "Bengaluru"},
                          artist={"genres": ["rock", "indie"], "skills": ["guitar", "drums", "bass"]})
         olivia = self._user(
-            "olivia@demo.eqora", "Olivia Fernandes", ["organizer", "artist"],
+            "olivia@demo.equra", "Olivia Fernandes", ["organizer", "artist"],
             {"headline": "Curator · The Loft Sessions", "location_label": "Bengaluru",
              "bio": "Running weekly acoustic nights since 2019. Every artist deserves a stage."},
             organizer={"organization_name": "The Loft Sessions"},
         )
-        rohan = self._user("rohan@demo.eqora", "Rohan Mehta", ["organizer"],
+        rohan = self._user("rohan@demo.equra", "Rohan Mehta", ["organizer"],
                            {"headline": "Festival booker · Neon Nights", "location_label": "Mumbai"},
                            organizer={"organization_name": "Neon Nights"})
 

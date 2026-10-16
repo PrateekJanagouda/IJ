@@ -1,4 +1,4 @@
-# EQora
+# EQura
 
 An artist network and gig marketplace for the live-performance ecosystem.
 

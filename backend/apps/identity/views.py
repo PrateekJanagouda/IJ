@@ -148,7 +148,7 @@ class PasswordResetRequestView(GenericAPIView):
             token = default_token_generator.make_token(user)
             link = f"{settings.FRONTEND_BASE_URL}/reset-password?uid={uid}&token={token}"
             send_mail(
-                "Reset your EQora password",
+                "Reset your EQura password",
                 f"Use this link to reset your password (valid for 1 hour):\n{link}\n\n"
                 "If you did not request this, you can ignore this email.",
                 None,

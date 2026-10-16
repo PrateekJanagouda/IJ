@@ -1,4 +1,4 @@
-# EQora MVP Scope, User Journeys, and Permissions
+# EQura MVP Scope, User Journeys, and Permissions
 
 **Document:** `docs/mvp-and-permissions.md`\
 **Version:** 0.2\
@@ -7,7 +7,7 @@
 
 ## 1. Purpose
 
-This document defines EQora's first-release scope, three primary user
+This document defines EQura's first-release scope, three primary user
 journeys, and role/permission model. Confirmed decisions:
 
 1.  Full direct messaging ships at launch.
@@ -17,7 +17,7 @@ journeys, and role/permission model. Confirmed decisions:
     slots, depending on host requirements. Standalone opportunities are
     also supported.
 
-EQora is an integrated artist network and gig marketplace for the
+EQura is an integrated artist network and gig marketplace for the
 live-performance ecosystem.
 
 ## 2. Prioritization

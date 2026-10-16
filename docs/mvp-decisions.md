@@ -1,4 +1,4 @@
-# EQora MVP Implementation Decisions
+# EQura MVP Implementation Decisions
 
 **Status:** Approved assumptions for the first implementation. Each is reversible; the "Change it by" column points at the single place to edit.
 **Depends on:** all documents in `docs/`.

@@ -41,7 +41,7 @@ export default function RegisterPage() {
     <>
       <TopBar back />
       <form className="page" onSubmit={submit} style={{ gap: 14 }}>
-        <h2 style={{ fontSize: 28, margin: "10px 0 0", letterSpacing: "-0.02em" }}>Join EQora</h2>
+        <h2 style={{ fontSize: 28, margin: "10px 0 0", letterSpacing: "-0.02em" }}>Join EQura</h2>
         <div className="col" style={{ gap: 8 }}>
           <span className="small muted bold">You can be both — pick all that apply</span>
           {ROLES.map((r) => (

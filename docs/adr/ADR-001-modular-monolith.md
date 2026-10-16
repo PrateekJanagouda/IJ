@@ -1,13 +1,13 @@
-# ADR-001: Adopt a Modular Monolith for EQora
+# ADR-001: Adopt a Modular Monolith for EQura
 
 - **Status:** Accepted as the initial architecture direction
 - **Date:** 2026-10-14
-- **Decision owners:** EQora product and engineering
+- **Decision owners:** EQura product and engineering
 - **Related documents:** `docs/architecture.md`, `docs/domain-design.md`, `docs/api-and-security.md`, `docs/database-design.md`
 
 ## Context
 
-EQora combines a professional/social network for artists with a gig and opportunity marketplace. The planned launch includes identity and profiles, posts, follows, likes, comments, shares, notifications, direct messaging, events, independently apply-able opportunities, applications, performer selection, and moderation. AI-assisted workflows may be introduced through controlled backend capabilities.
+EQura combines a professional/social network for artists with a gig and opportunity marketplace. The planned launch includes identity and profiles, posts, follows, likes, comments, shares, notifications, direct messaging, events, independently apply-able opportunities, applications, performer selection, and moderation. AI-assisted workflows may be introduced through controlled backend capabilities.
 
 The product needs transactional consistency for applications and selections, common authentication and authorization, fast iteration, and a codebase that can be maintained without a large platform team. Splitting into microservices at the start would add network boundaries, distributed tracing and failure modes, deployment complexity, and cross-service consistency concerns before independent scaling requirements are known.
 
@@ -83,7 +83,7 @@ Rejected for the initial phase because it increases operational and distributed-
 Rejected because implicit dependencies and unclear data ownership would make social, messaging, marketplace, and AI capabilities harder to evolve safely.
 
 ### Serverless functions as the primary backend
-Not selected as the main architecture because EQora's transactional domain workflows and real-time messaging benefit from a cohesive domain layer. Serverless components may still be used for appropriate integrations or asynchronous workloads.
+Not selected as the main architecture because EQura's transactional domain workflows and real-time messaging benefit from a cohesive domain layer. Serverless components may still be used for appropriate integrations or asynchronous workloads.
 
 ## Validation
 

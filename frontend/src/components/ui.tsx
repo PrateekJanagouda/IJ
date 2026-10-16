@@ -64,7 +64,7 @@ export function TopBar({ title, back, right }: { title?: React.ReactNode; back?:
           <Icon name="back" />
         </button>
       )}
-      <h1>{title ?? <span className="brand">EQ<span>ora</span></span>}</h1>
+      <h1>{title ?? <span className="brand">EQ<span>ura</span></span>}</h1>
       {right}
     </header>
   );

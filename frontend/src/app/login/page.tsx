@@ -50,7 +50,7 @@ export default function LoginPage() {
         </div>
         <button className="btn primary block" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
         <p className="muted small" style={{ textAlign: "center" }}>
-          New to EQora? <Link href="/register" style={{ color: "var(--spot)" }}>Create an account</Link>
+          New to EQura? <Link href="/register" style={{ color: "var(--spot)" }}>Create an account</Link>
         </p>
       </form>
     </>

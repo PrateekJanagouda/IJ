@@ -1,4 +1,4 @@
-# EQora Database Design
+# EQura Database Design
 
 **Status:** Proposed schema for review  
 **Milestone:** Hour 6  

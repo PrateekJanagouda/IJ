@@ -1,8 +1,8 @@
-# EQora Domain Design: Hour 4
+# EQura Domain Design: Hour 4
 
 ## Objective
 
-Define the planned Django domain modules, their data ownership and cross-domain rules, and the safe interaction model for future AI agents. EQora remains a modular monolith: logical Django apps in one backend project, not separate microservices.
+Define the planned Django domain modules, their data ownership and cross-domain rules, and the safe interaction model for future AI agents. EQura remains a modular monolith: logical Django apps in one backend project, not separate microservices.
 
 ## 1. Planned Django domain modules
 
@@ -60,7 +60,7 @@ Infrastructure adapters such as email, object storage, search, background jobs a
 
 ## 3. AI agent interaction model
 
-AI agents are controlled clients of EQora's backend capabilities. They may propose plans and choose approved tools, but normal backend services remain responsible for authorization, validation, persistence and business invariants.
+AI agents are controlled clients of EQura's backend capabilities. They may propose plans and choose approved tools, but normal backend services remain responsible for authorization, validation, persistence and business invariants.
 
 ### Execution path
 

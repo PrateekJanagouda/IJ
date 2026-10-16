@@ -3,5 +3,5 @@
 from drf_spectacular.authentication import SessionScheme
 
 
-class EqoraSessionScheme(SessionScheme):
+class EQuraSessionScheme(SessionScheme):
     target_class = "shared.auth.SessionAuthentication"

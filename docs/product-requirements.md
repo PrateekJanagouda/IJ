@@ -1,22 +1,22 @@
-# EQora Product Requirements
+# EQura Product Requirements
 
 **Document:** `docs/product-requirements.md`\
 **Version:** 0.1\
 **Status:** Initial product definition\
-**Purpose:** Define EQora's product vision, users, MVP scope,
+**Purpose:** Define EQura's product vision, users, MVP scope,
 assumptions, and validation criteria before implementation.
 
 ------------------------------------------------------------------------
 
 ## 1. Product summary
 
-**EQora is an integrated artist network and gig marketplace for the
+**EQura is an integrated artist network and gig marketplace for the
 live-performance ecosystem.** It helps artists build a professional
 presence, discover and apply for performance opportunities, connect with
 other creatives, and grow an audience. It helps event organizers and
 venues discover talent, manage applications, and assemble lineups.
 
-EQora combines three connected experiences:
+EQura combines three connected experiences:
 
 1.  **Professional identity:** artist, organizer, and venue profiles
     that communicate who users are and what they do.
@@ -53,7 +53,7 @@ intended product experience that connects creative identity, community
 discovery, and performance-opportunity management from first discovery
 through application and selection.
 
-This is the product hypothesis EQora must validate with real artists,
+This is the product hypothesis EQura must validate with real artists,
 organizers, and venues. It should not be treated as proven market
 research.
 
@@ -61,7 +61,7 @@ research.
 
 > **Every artist deserves a stage. Every stage deserves its artists.**
 
-EQora aims to become a trusted professional and social network for the
+EQura aims to become a trusted professional and social network for the
 live-performance ecosystem, where artists can showcase their work,
 discover opportunities, build relationships, and grow their careers,
 while organizers and venues can discover talent and coordinate
@@ -73,7 +73,7 @@ performances.
     people, events, and opportunities, not become an end in itself.
 -   **Useful profiles:** Profiles should make it easy to understand a
     person's skills, style, experience, location, and work.
--   **Two-sided value:** EQora must be useful to both talent and the
+-   **Two-sided value:** EQura must be useful to both talent and the
     people who create or fill performance opportunities.
 -   **Clear status and expectations:** Opportunity listings should
     communicate requirements, dates, location, compensation where
@@ -90,7 +90,7 @@ performances.
 ## 4. Target users and needs
 
 A single account may support multiple roles. Roles describe how a person
-uses EQora; permissions must still be enforced for each resource and
+uses EQura; permissions must still be enforced for each resource and
 action.
 
 ### 4.1 Artists and performers
@@ -326,7 +326,7 @@ They may be considered after pilot feedback.
     validate the concept first.
 
 These exclusions are sequencing decisions, not a statement that the
-capabilities will never belong in EQora.
+capabilities will never belong in EQura.
 
 ## 8. Assumptions to validate
 
@@ -398,7 +398,7 @@ a useful leading indicator.
 
   Time to first booking               Time from artist activation to
                                       first confirmed booking through
-                                      EQora.
+                                      EQura.
 
   Opportunity fill rate               Share of opportunities that reach
                                       the organizer's intended fill or

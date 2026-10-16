@@ -1,4 +1,4 @@
-# EQora API and Security Baseline
+# EQura API and Security Baseline
 
 **Milestone:** Hour 5  
 **Status:** Proposed baseline for implementation  
@@ -6,7 +6,7 @@
 
 ## 1. Purpose
 
-This document establishes consistent API conventions, a preliminary authentication strategy, and minimum security and privacy requirements for EQora. These requirements apply to the social network, artist profiles, events, opportunities, applications, direct messaging, notifications, moderation, and future AI-agent capabilities.
+This document establishes consistent API conventions, a preliminary authentication strategy, and minimum security and privacy requirements for EQura. These requirements apply to the social network, artist profiles, events, opportunities, applications, direct messaging, notifications, moderation, and future AI-agent capabilities.
 
 ## 2. API conventions
 
@@ -278,7 +278,7 @@ Before launch:
 4. Retention periods and deletion exceptions for messages, reports, and audit records.
 5. Whether any AI feature sends user content to an external model provider.
 6. Whether high-risk accounts or administrative actions require multifactor authentication.
-7. Applicable privacy, consumer, and platform obligations for EQora's launch jurisdictions.
+7. Applicable privacy, consumer, and platform obligations for EQura's launch jurisdictions.
 
 ## 9. Acceptance criteria
 
