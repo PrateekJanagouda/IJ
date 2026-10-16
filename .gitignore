@@ -9,3 +9,4 @@ backend/staticfiles/
 node_modules/
 .next/
 .DS_Store
+*.tsbuildinfo

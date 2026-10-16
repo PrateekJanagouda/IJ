@@ -43,3 +43,25 @@ jobs:
         env:
           DJANGO_SECRET_KEY: ci-only-not-a-real-secret-0123456789abcdefghijklmnopqrstuvwxyz
           DJANGO_ALLOWED_HOSTS: api.example.com
+      - name: Committed OpenAPI schema is current
+        run: |
+          DJANGO_DEBUG=true python manage.py spectacular --fail-on-warn --file openapi.yml
+          git diff --exit-code openapi.yml
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Generated API types match the backend contract
+        run: npm run gen:api && git diff --exit-code src/lib/schema.d.ts
+      - run: npm run typecheck
+      - run: npm run build

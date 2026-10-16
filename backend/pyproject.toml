@@ -12,3 +12,7 @@ extend-exclude = ["**/migrations/*"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "DJ"]
 ignore = ["DJ008"]
+
+[tool.ruff.lint.per-file-ignores]
+# Demo fixture prose reads better unwrapped.
+"apps/opportunities/management/commands/seed_demo.py" = ["E501"]

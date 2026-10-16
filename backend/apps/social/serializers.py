@@ -1,4 +1,5 @@
 from django.conf import settings
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from shared.serializers import UserSummarySerializer
@@ -12,6 +13,17 @@ class EmbeddedPostSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
         fields = ["id", "author", "body", "created_at"]
+        read_only_fields = fields
+
+
+class RepostRefSerializer(serializers.Serializer):
+    """The reposted original, or a tombstone ({id, unavailable: true}) if it's gone."""
+
+    id = serializers.UUIDField()
+    author = UserSummarySerializer(required=False)
+    body = serializers.CharField(required=False)
+    created_at = serializers.DateTimeField(required=False)
+    unavailable = serializers.BooleanField(required=False)
 
 
 class PostSerializer(serializers.ModelSerializer):
@@ -28,8 +40,10 @@ class PostSerializer(serializers.ModelSerializer):
             "id", "author", "body", "visibility", "repost_of", "like_count", "comment_count",
             "viewer_has_liked", "share_url", "created_at", "updated_at",
         ]
+        read_only_fields = fields
 
-    def get_repost_of(self, post) -> dict | None:
+    @extend_schema_field(RepostRefSerializer(allow_null=True))
+    def get_repost_of(self, post):
         original = post.repost_of
         if original is None:
             return None
@@ -57,6 +71,7 @@ class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ["id", "post_id", "author", "body", "created_at"]
+        read_only_fields = fields
 
 
 class CommentInputSerializer(serializers.Serializer):
@@ -67,7 +82,8 @@ class FollowSerializer(serializers.Serializer):
     user = serializers.SerializerMethodField()
     created_at = serializers.DateTimeField()
 
-    def get_user(self, follow) -> dict:
+    @extend_schema_field(UserSummarySerializer)
+    def get_user(self, follow):
         followers = self.context.get("direction") == "followers"
         target = follow.follower if followers else follow.followed
         return UserSummarySerializer(target).data

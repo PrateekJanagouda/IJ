@@ -2,6 +2,7 @@ import re
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.conf import settings
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.profiles.models import Venue
@@ -26,6 +27,23 @@ class VenueRefSerializer(serializers.Serializer):
     city = serializers.CharField()
 
 
+class EventRefSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    title = serializers.CharField()
+    status = serializers.CharField()
+    starts_at = serializers.DateTimeField(allow_null=True)
+
+
+class ViewerApplicationSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    status = serializers.ChoiceField(choices=Application.Status.choices)
+
+
+class ManagerStatsSerializer(serializers.Serializer):
+    applications = serializers.DictField(child=serializers.IntegerField())
+    confirmed_bookings = serializers.IntegerField()
+
+
 class EventSerializer(serializers.ModelSerializer):
     owner = UserSummarySerializer(read_only=True)
     venue = VenueRefSerializer(read_only=True, allow_null=True)
@@ -40,6 +58,7 @@ class EventSerializer(serializers.ModelSerializer):
             "published_at", "cancelled_at", "cancellation_reason", "viewer_can_manage",
             "share_url", "created_at", "updated_at",
         ]
+        read_only_fields = fields
 
     def get_viewer_can_manage(self, event) -> bool:
         request = self.context.get("request")
@@ -82,8 +101,10 @@ class OpportunitySerializer(serializers.ModelSerializer):
             "accepting_applications", "published_at", "cancelled_at", "cancellation_reason",
             "share_url", "created_at", "updated_at",
         ]
+        read_only_fields = fields
 
-    def get_event(self, opp) -> dict | None:
+    @extend_schema_field(EventRefSerializer(allow_null=True))
+    def get_event(self, opp):
         if not opp.event_id:
             return None
         e = opp.event
@@ -115,14 +136,16 @@ class OpportunityDetailSerializer(OpportunitySerializer):
     def get_viewer_can_manage(self, opp) -> bool:
         return services.can_manage_opportunity(self._user(), opp)
 
-    def get_viewer_application(self, opp) -> dict | None:
+    @extend_schema_field(ViewerApplicationSerializer(allow_null=True))
+    def get_viewer_application(self, opp):
         user = self._user()
         if not user or not user.is_authenticated:
             return None
         app = opp.applications.filter(applicant=user).only("id", "status").first()
         return {"id": str(app.id), "status": app.status} if app else None
 
-    def get_manager_stats(self, opp) -> dict | None:
+    @extend_schema_field(ManagerStatsSerializer(allow_null=True))
+    def get_manager_stats(self, opp):
         if not services.can_manage_opportunity(self._user(), opp):
             return None
         counts = {s: 0 for s in Application.Status.values}
@@ -207,8 +230,10 @@ class ApplicationSerializer(serializers.ModelSerializer):
             "id", "opportunity", "applicant", "status", "cover_note", "portfolio_items",
             "booking", "submitted_at", "decided_at", "updated_at",
         ]
+        read_only_fields = fields
 
-    def get_booking(self, application) -> dict | None:
+    @extend_schema_field(BookingRefSerializer(allow_null=True))
+    def get_booking(self, application):
         booking = getattr(application, "booking", None)
         return BookingRefSerializer(booking).data if booking else None
 
@@ -226,6 +251,7 @@ class StatusChangeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ApplicationStatusChange
         fields = ["id", "from_status", "to_status", "actor", "reason", "created_at"]
+        read_only_fields = fields
 
 
 class BookingSerializer(serializers.ModelSerializer):
@@ -238,3 +264,4 @@ class BookingSerializer(serializers.ModelSerializer):
             "id", "opportunity", "application_id", "performer", "status", "selected_at",
             "cancelled_at", "cancellation_reason", "completed_at",
         ]
+        read_only_fields = fields

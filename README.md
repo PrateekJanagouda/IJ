@@ -2,7 +2,9 @@
 
 An artist network and gig marketplace for the live-performance ecosystem.
 
-**Status:** MVP backend implemented (Django modular monolith). The web frontend (Next.js) is next.
+**Status:** MVP backend (Django modular monolith) and mobile-first web app (Next.js) implemented.
+
+![Mobile UI preview](docs/mobile-ui-preview.png)
 
 - Product & scope: [`docs/product-requirements.md`](docs/product-requirements.md), [`docs/mvp-and-permissions.md`](docs/mvp-and-permissions.md)
 - Architecture: [`docs/adr/ADR-001-modular-monolith.md`](docs/adr/ADR-001-modular-monolith.md), [`docs/architecture.md`](docs/architecture.md), [`docs/domain-design.md`](docs/domain-design.md)
@@ -31,6 +33,20 @@ python manage.py runserver
 ```
 
 With `DJANGO_DEBUG=true` (or `EXPOSE_API_DOCS=true`), the interactive API docs are at `/api/v1/docs/`, and the OpenAPI schema at `/api/v1/schema/`.
+
+### Web app
+
+```bash
+cd frontend
+npm install
+npm run dev                         # http://localhost:3000 (proxies /api to :8000)
+```
+
+For demo data: `cd backend && python manage.py seed_demo`. It prints two logins (one artist, one organizer). All names are fictional.
+
+The browser only ever talks to Next.js, which proxies `/api/*` to Django. Because everything is same-origin, session and CSRF cookies just work: there's no CORS, and no tokens sit in JavaScript-readable storage. Set `DJANGO_CSRF_TRUSTED_ORIGINS` to the frontend origin.
+
+**API contract:** `backend/openapi.yml` is generated from the code. `frontend/src/lib/schema.d.ts` is generated from that schema (`npm run gen:api`). Neither file is ever edited by hand, and CI fails if either one drifts from the code.
 
 ## Test
 

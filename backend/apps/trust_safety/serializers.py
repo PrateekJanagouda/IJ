@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from shared.serializers import UserSummarySerializer
@@ -46,7 +47,8 @@ class BlockSerializer(serializers.Serializer):
     user = serializers.SerializerMethodField()
     created_at = serializers.DateTimeField()
 
-    def get_user(self, block) -> dict:
+    @extend_schema_field(UserSummarySerializer)
+    def get_user(self, block):
         return UserSummarySerializer(block.blocked).data
 
 

@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.identity import services as identity
@@ -36,12 +37,14 @@ class ArtistDetailsSerializer(serializers.ModelSerializer):
     class Meta:
         model = ArtistDetails
         fields = ["artist_name", "experience_summary", "genres", "skills"]
+        read_only_fields = fields
 
 
 class OrganizerDetailsSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrganizerDetails
         fields = ["organization_name", "verification_status"]
+        read_only_fields = fields
 
 
 class ProfileSerializer(serializers.ModelSerializer):
@@ -61,20 +64,24 @@ class ProfileSerializer(serializers.ModelSerializer):
             "roles", "artist", "organizer", "portfolio", "follower_count", "following_count",
             "viewer_is_following", "created_at", "updated_at",
         ]
+        read_only_fields = fields
 
     def get_roles(self, profile) -> list[str]:
         public = {"artist", "organizer"}
         return sorted(identity.roles_of(profile.user) & public)
 
-    def get_artist(self, profile) -> dict | None:
+    @extend_schema_field(ArtistDetailsSerializer(allow_null=True))
+    def get_artist(self, profile):
         details = getattr(profile, "artist", None)  # reverse 1:1 missing -> None
         return ArtistDetailsSerializer(details).data if details else None
 
-    def get_organizer(self, profile) -> dict | None:
+    @extend_schema_field(OrganizerDetailsSerializer(allow_null=True))
+    def get_organizer(self, profile):
         details = getattr(profile, "organizer", None)
         return OrganizerDetailsSerializer(details).data if details else None
 
-    def get_portfolio(self, profile) -> list[dict] | None:
+    @extend_schema_field(PortfolioItemSerializer(many=True, allow_null=True))
+    def get_portfolio(self, profile):
         if not self.context.get("include_portfolio", True):
             return None
         return PortfolioItemSerializer(profile.portfolio.all(), many=True).data
@@ -107,6 +114,7 @@ class ProfileListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
         fields = ["id", "user_id", "display_name", "headline", "location_label", "artist"]
+        read_only_fields = fields
 
 
 class ArtistInputSerializer(serializers.Serializer):

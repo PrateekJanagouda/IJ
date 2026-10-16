@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from shared.serializers import UserSummarySerializer
@@ -13,12 +14,19 @@ class MessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
         fields = ["id", "conversation_id", "sender", "body", "is_deleted", "created_at"]
+        read_only_fields = fields
 
     def get_body(self, message) -> str | None:
         return None if message.deleted_at else message.body
 
     def get_is_deleted(self, message) -> bool:
         return message.deleted_at is not None
+
+
+class LastMessageSerializer(serializers.Serializer):
+    sender_id = serializers.UUIDField()
+    preview = serializers.CharField(allow_null=True)
+    is_deleted = serializers.BooleanField()
 
 
 class ConversationSerializer(serializers.ModelSerializer):
@@ -30,11 +38,14 @@ class ConversationSerializer(serializers.ModelSerializer):
         model = Conversation
         fields = ["id", "conversation_type", "participants", "unread_count", "last_message",
                   "last_message_at", "created_at"]
+        read_only_fields = fields
 
-    def get_participants(self, conversation) -> list[dict]:
+    @extend_schema_field(UserSummarySerializer(many=True))
+    def get_participants(self, conversation):
         return [UserSummarySerializer(p.user).data for p in conversation.participants.all()]
 
-    def get_last_message(self, conversation) -> dict | None:
+    @extend_schema_field(LastMessageSerializer(allow_null=True))
+    def get_last_message(self, conversation):
         if not getattr(conversation, "last_message_sender_id", None):
             return None
         deleted = conversation.last_message_deleted_at is not None
