@@ -358,23 +358,33 @@ button { cursor: pointer; background: none; border: 0; padding: 0; text-align: i
 .seg button.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / 0.15); }
 .preview-card { pointer-events: none; display: flex; justify-content: center; padding: 18px 0 8px; background: var(--wall); border-radius: 18px; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+.live { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-2); }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: #3ddc84; box-shadow: 0 0 0 0 rgb(61 220 132 / 0.6); animation: pulse 2s infinite; flex: none; }
+@keyframes pulse { 70% { box-shadow: 0 0 0 7px rgb(61 220 132 / 0); } 100% { box-shadow: 0 0 0 0 rgb(61 220 132 / 0); } }
+.toggle-card input[type=checkbox] { justify-self: end; }
+@media (max-width: 760px) {
+  .who { overflow-x: auto; scrollbar-width: none; }
+  .who::-webkit-scrollbar { display: none; }
+  .who button { flex: none; max-width: 150px; }
+  .live { font-size: 11px; }
+  .phone { height: calc(100dvh - 74px); }
+}
 </style>
-</head>
-<body>
-
 
 <div class="stage">
   <aside class="rail" aria-label="Demo controls">
     <div class="logo"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>EQura</div>
-    <p>Every artist deserves a stage. A clickable prototype running the backend's real rules on demo data.</p>
-    <div class="kicker">Viewing as</div>
+    <p>Every artist deserves a stage. Live: everyone on this link sees the same gigs, applications and messages, as they happen.</p>
+    <div class="live" id="live">Connecting…</div>
+    <div class="kicker">Acting as</div>
     <div class="who" id="who"></div>
-    <div class="kicker">Try this</div>
+    <div class="kicker">Demo it on two screens</div>
     <ol class="tries">
-      <li>As <b>Asha</b>, pull a flyer off the wall and apply to the <b>audition</b>.</li>
-      <li>Switch to <b>Olivia</b>. In My gigs, review the <b>headline set</b> and book Asha.</li>
-      <li>Back as <b>Asha</b>: open Gigs for the booking moment.</li>
-      <li>Open Asha's profile and press play on a track.</li>
+      <li>Open this link on your <b>laptop</b> and your <b>phone</b>.</li>
+      <li>Laptop as <b>Olivia</b> (host), phone as <b>Asha</b> (artist), or as <b>yourself</b>.</li>
+      <li>Laptop: My gigs → <b>Headline set</b> → <b>Book</b> Asha. Phone: "You're on!" pops up.</li>
+      <li>Phone: <b>Say thanks</b>. Watch the message land on the laptop.</li>
+      <li>Phone as <b>You</b>: make a profile, apply to the <b>open mic</b>. It shows up for Olivia.</li>
     </ol>
     <div class="rail-actions">
       <button class="ghost-btn" id="theme" type="button">Day / night print</button>
@@ -385,7 +395,7 @@ button { cursor: pointer; background: none; border: 0; padding: 0; text-align: i
 </div>
 
 <script>
-/* ======================= Demo data ======================= */
+/* ======================= Demo data (offline mode + seeding) ======================= */
 const DAY = 86400000;
 function ist(days, hour, minute = 0) {
   const t = new Date(Date.now() + 5.5 * 3600000);
@@ -393,39 +403,41 @@ function ist(days, hour, minute = 0) {
 }
 const ago = (min) => new Date(Date.now() - min * 60000).toISOString();
 function seed() {
-  const users = {
-    asha: { id: "asha", name: "Asha Rao", roles: ["artist"], headline: "Indie-folk singer-songwriter", city: "Bengaluru", shows: 64, ink: "--pink",
+  const P = (o) => ({ demo: true, portfolio: [], skills: [], genres: [], bio: "", ...o });
+  const people = [
+    P({ id: "asha", name: "Asha Rao", roles: ["artist"], headline: "Indie-folk singer-songwriter", city: "Bengaluru", shows: 64, ink: "--pink",
       bio: "Songs about monsoons and metro rides. Guitar, loop pedal, and too many capos. Two EPs out, always up for an open mic.",
       genres: ["folk", "indie", "acoustic"], skills: ["Vocals", "Guitar", "Looping"],
-      portfolio: [{ id: "pf1", title: "Monsoon Letters", sub: "Live session · 4:12", type: "video" }, { id: "pf2", title: "Metro Lines", sub: "From the Metro Lines EP · 3:38", type: "audio" }] },
-    olivia: { id: "olivia", name: "Olivia Fernandes", roles: ["organizer", "artist"], headline: "Curator, The Loft Sessions", city: "Bengaluru", shows: 210, ink: "--blue",
-      bio: "Weekly acoustic nights in Indiranagar since 2019. Good sound, warm crowd, great chai.", genres: ["acoustic"], skills: ["Booking", "Hosting"], portfolio: [] },
-    rohan: { id: "rohan", name: "Rohan Mehta", roles: ["organizer"], headline: "Booker, Neon Nights", city: "Mumbai", shows: 140, ink: "--orange", bio: "Rooftops, sunsets and loud speakers.", genres: ["electronic"], skills: ["Booking"], portfolio: [] },
-    meera: { id: "meera", name: "Meera Iyer", roles: ["artist"], headline: "Jazz vocalist", city: "Bengaluru", shows: 88, ink: "--teal", bio: "Standards are home. Originals are the adventure.",
-      genres: ["jazz", "soul", "indie"], skills: ["Vocals"], portfolio: [{ id: "pf3", title: "Autumn Leaves", sub: "Trio, live · 5:02", type: "video" }] },
-    kabir: { id: "kabir", name: "Kabir Sethi", roles: ["artist"], headline: "House and disco DJ", city: "Mumbai", shows: 120, ink: "--yellow", bio: "Warm records for long sunsets.", genres: ["electronic"], skills: ["DJ"],
-      portfolio: [{ id: "pf5", title: "Sunset Mix 07", sub: "Mix · 62 min", type: "audio" }] },
-    dev: { id: "dev", name: "Dev & The Dusk", roles: ["artist"], headline: "Alt-rock four-piece", city: "Bengaluru", shows: 45, ink: "--orange", bio: "Loud guitars, quiet bridges.",
-      genres: ["rock", "indie"], skills: ["Band"], portfolio: [{ id: "pf4", title: "Dusk Tapes Vol. 1", sub: "EP · 4 tracks", type: "audio" }] },
-  };
-  const events = { loft: { id: "loft", title: "Loft Sessions", owner: "olivia" }, neon: { id: "neon", title: "Neon Nights Rooftop", owner: "rohan" } };
+      portfolio: [{ id: "pf1", title: "Monsoon Letters", sub: "Live session · 4:12", type: "video" }, { id: "pf2", title: "Metro Lines", sub: "From the Metro Lines EP · 3:38", type: "audio" }] }),
+    P({ id: "olivia", name: "Olivia Fernandes", roles: ["organizer", "artist"], headline: "Curator, The Loft Sessions", city: "Bengaluru", shows: 210, ink: "--blue",
+      bio: "Weekly acoustic nights in Indiranagar since 2019. Good sound, warm crowd, great chai.", genres: ["acoustic"], skills: ["Booking", "Hosting"] }),
+    P({ id: "rohan", name: "Rohan Mehta", roles: ["organizer"], headline: "Booker, Neon Nights", city: "Mumbai", shows: 140, ink: "--orange", bio: "Rooftops, sunsets and loud speakers.", genres: ["electronic"], skills: ["Booking"] }),
+    P({ id: "meera", name: "Meera Iyer", roles: ["artist"], headline: "Jazz vocalist", city: "Bengaluru", shows: 88, ink: "--teal", bio: "Standards are home. Originals are the adventure.",
+      genres: ["jazz", "soul", "indie"], skills: ["Vocals"], portfolio: [{ id: "pf3", title: "Autumn Leaves", sub: "Trio, live · 5:02", type: "video" }] }),
+    P({ id: "kabir", name: "Kabir Sethi", roles: ["artist"], headline: "House and disco DJ", city: "Mumbai", shows: 120, ink: "--yellow", bio: "Warm records for long sunsets.", genres: ["electronic"], skills: ["DJ"],
+      portfolio: [{ id: "pf5", title: "Sunset Mix 07", sub: "Mix · 62 min", type: "audio" }] }),
+    P({ id: "dev", name: "Dev & The Dusk", roles: ["artist"], headline: "Alt-rock four-piece", city: "Bengaluru", shows: 45, ink: "--orange", bio: "Loud guitars, quiet bridges.",
+      genres: ["rock", "indie"], skills: ["Band"], portfolio: [{ id: "pf4", title: "Dusk Tapes Vol. 1", sub: "EP · 4 tracks", type: "audio" }] }),
+  ];
+  const events = [{ id: "loft", title: "Loft Sessions", owner: "olivia" }, { id: "neon", title: "Neon Nights Rooftop", owner: "rohan" }];
+  const G = (o) => ({ status: "published", provides: [], bring: [], genres: [], event: null, at: ago(3000), ...o });
   const gigs = [
-    { id: "openmic", event: "loft", owner: "olivia", title: "Acoustic open mic", type: "open_mic_slot", comp: "unpaid", capacity: 6, starts: ist(4, 20), deadline: ist(3, 18),
-      venue: "The Loft", area: "Indiranagar", genres: ["acoustic", "folk", "indie"], status: "published", set: "15 min",
-      desc: "Two songs or fifteen minutes, whichever comes first. Originals encouraged.", provides: ["Vocal mic and DI box", "House guitar if you need one"], bring: ["A link to one live performance"] },
-    { id: "feature", event: "loft", owner: "olivia", title: "Headline set", type: "paid_gig", comp: "paid", amount: 8000, capacity: 1, starts: ist(4, 22), deadline: ist(2, 18),
-      venue: "The Loft", area: "Indiranagar", genres: ["indie", "folk"], status: "published", set: "40 min",
-      desc: "Close the night with a full set to a listening room of about 120.", provides: ["Full PA and monitor mix", "Sound check at 6pm"], bring: ["Your own instruments"] },
-    { id: "host", event: "loft", owner: "olivia", title: "Host for the night", type: "host_role", comp: "paid", amount: 3000, capacity: 1, starts: ist(4, 20), deadline: ist(3, 12),
-      venue: "The Loft", area: "Indiranagar", genres: [], status: "published", set: "3 hrs", desc: "Keep the energy up between sets and introduce each artist.", provides: ["Handheld mic"], bring: [] },
-    { id: "dj", event: "neon", owner: "rohan", title: "Sunset DJ slot", type: "dj_slot", comp: "paid", amount: 15000, capacity: 2, starts: ist(12, 18), deadline: ist(8, 18),
-      venue: "Neon Rooftop", area: "Lower Parel, Mumbai", genres: ["electronic"], status: "published", set: "90 min", desc: "Warm-up set as the sun goes down. House and disco.", provides: ["2× CDJ-3000, DJM-900"], bring: ["USB sticks"] },
-    { id: "band", event: "neon", owner: "rohan", title: "Live band opener", type: "band_slot", comp: "revenue_share", capacity: 1, starts: ist(12, 17), deadline: ist(9, 18),
-      venue: "Neon Rooftop", area: "Lower Parel, Mumbai", genres: ["rock", "indie"], status: "published", set: "45 min", desc: "Open the night for 400 people.", provides: ["Backline: drums, two amps"], bring: ["Guitars, cymbals"] },
-    { id: "jazz", event: null, owner: "rohan", title: "Jazz dinner vocalist", type: "paid_gig", comp: "paid", amount: 25000, capacity: 1, starts: ist(9, 19), deadline: ist(6, 18),
-      venue: "Private residence", area: "Koramangala", genres: ["jazz"], status: "published", set: "2 × 45 min", desc: "Standards for a 60-guest dinner. Pianist provided. Smart dress.", provides: ["Pianist", "PA"], bring: ["Set list in advance"] },
-    { id: "audition", event: null, owner: "rohan", title: "Musical theatre audition", type: "audition", comp: "negotiable", capacity: 8, starts: ist(15, 11), deadline: ist(11, 18),
-      venue: "Rangashankara", area: "JP Nagar", genres: ["theatre", "indie"], status: "published", set: "16 bars", desc: "Open call for singers and dancers for a six-show run.", provides: ["Accompanist"], bring: ["16 bars of an up-tempo song", "Comfortable shoes"] },
+    G({ id: "openmic", event: "loft", owner: "olivia", title: "Acoustic open mic", type: "open_mic_slot", comp: "unpaid", capacity: 6, starts: ist(4, 20), deadline: ist(3, 18),
+      venue: "The Loft", area: "Indiranagar", genres: ["acoustic", "folk", "indie"], set: "15 min",
+      desc: "Two songs or fifteen minutes, whichever comes first. Originals encouraged.", provides: ["Vocal mic and DI box", "House guitar if you need one"], bring: ["A link to one live performance"] }),
+    G({ id: "feature", event: "loft", owner: "olivia", title: "Headline set", type: "paid_gig", comp: "paid", amount: 8000, capacity: 1, starts: ist(4, 22), deadline: ist(2, 18),
+      venue: "The Loft", area: "Indiranagar", genres: ["indie", "folk"], set: "40 min",
+      desc: "Close the night with a full set to a listening room of about 120.", provides: ["Full PA and monitor mix", "Sound check at 6pm"], bring: ["Your own instruments"] }),
+    G({ id: "host", event: "loft", owner: "olivia", title: "Host for the night", type: "host_role", comp: "paid", amount: 3000, capacity: 1, starts: ist(4, 20), deadline: ist(3, 12),
+      venue: "The Loft", area: "Indiranagar", set: "3 hrs", desc: "Keep the energy up between sets and introduce each artist.", provides: ["Handheld mic"] }),
+    G({ id: "dj", event: "neon", owner: "rohan", title: "Sunset DJ slot", type: "dj_slot", comp: "paid", amount: 15000, capacity: 2, starts: ist(12, 18), deadline: ist(8, 18),
+      venue: "Neon Rooftop", area: "Lower Parel, Mumbai", genres: ["electronic"], set: "90 min", desc: "Warm-up set as the sun goes down. House and disco.", provides: ["2× CDJ-3000, DJM-900"], bring: ["USB sticks"] }),
+    G({ id: "band", event: "neon", owner: "rohan", title: "Live band opener", type: "band_slot", comp: "revenue_share", capacity: 1, starts: ist(12, 17), deadline: ist(9, 18),
+      venue: "Neon Rooftop", area: "Lower Parel, Mumbai", genres: ["rock", "indie"], set: "45 min", desc: "Open the night for 400 people.", provides: ["Backline: drums, two amps"], bring: ["Guitars, cymbals"] }),
+    G({ id: "jazz", owner: "rohan", title: "Jazz dinner vocalist", type: "paid_gig", comp: "paid", amount: 25000, capacity: 1, starts: ist(9, 19), deadline: ist(6, 18),
+      venue: "Private residence", area: "Koramangala", genres: ["jazz"], set: "2 × 45 min", desc: "Standards for a 60-guest dinner. Pianist provided. Smart dress.", provides: ["Pianist", "PA"], bring: ["Set list in advance"] }),
+    G({ id: "audition", owner: "rohan", title: "Musical theatre audition", type: "audition", comp: "negotiable", capacity: 8, starts: ist(15, 11), deadline: ist(11, 18),
+      venue: "Rangashankara", area: "JP Nagar", genres: ["theatre", "indie"], set: "16 bars", desc: "Open call for singers and dancers for a six-show run.", provides: ["Accompanist"], bring: ["16 bars of an up-tempo song", "Comfortable shoes"] }),
   ];
   const apps = [
     { id: "a1", gig: "openmic", user: "asha", status: "accepted", note: "I'd play two originals: 'Monsoon Letters' and a new one about the Purple Line.", items: ["pf1", "pf2"], at: ago(2880) },
@@ -444,12 +456,14 @@ function seed() {
     { id: "p5", author: "kabir", body: "Sunset sets are the best sets. Change my mind.", at: ago(40) },
     { id: "p6", author: "asha", body: "See you there!", repostOf: "p1", at: ago(30) },
   ];
-  return { v: 4, viewer: "asha", users, events, gigs, apps, posts, celebrated: ["b1"],
-    bookings: [{ id: "b1", app: "a1", gig: "openmic", user: "asha", status: "confirmed" }],
-    likes: [["meera", "p2"], ["dev", "p2"], ["olivia", "p2"], ["asha", "p3"]],
+  const pair = (a, b) => ({ id: `${a}__${b}`, a, b });
+  return {
+    people, events, gigs, apps, posts,
+    bookings: [{ id: "b1", app: "a1", gig: "openmic", user: "asha", status: "confirmed", celebrated: true }],
+    likes: [["meera", "p2"], ["dev", "p2"], ["olivia", "p2"], ["asha", "p3"]].map(([u, p]) => ({ id: `${u}__${p}`, user: u, post: p })),
     comments: [{ id: "c1", post: "p2", user: "meera", body: "Can't wait to hear it live!", at: ago(60) }, { id: "c2", post: "p2", user: "olivia", body: "Front row reserved.", at: ago(50) }],
-    follows: [["asha", "olivia"], ["asha", "meera"], ["asha", "dev"], ["asha", "rohan"], ["meera", "asha"], ["olivia", "asha"], ["dev", "asha"], ["kabir", "rohan"], ["olivia", "meera"]],
-    convos: [{ id: "k1", users: ["olivia", "asha"], gig: "openmic", read: { olivia: ago(10), asha: ago(25) } }, { id: "k2", users: ["meera", "asha"], read: { meera: ago(5), asha: ago(200) } }],
+    follows: [["asha", "olivia"], ["asha", "meera"], ["asha", "dev"], ["asha", "rohan"], ["meera", "asha"], ["olivia", "asha"], ["dev", "asha"], ["kabir", "rohan"], ["olivia", "meera"]].map(([a, b]) => pair(a, b)),
+    convos: [{ id: "k1", users: ["olivia", "asha"], gig: "openmic", read: { olivia: ago(10), asha: ago(25) } }, { id: "k2", users: ["meera", "asha"], gig: null, read: { meera: ago(5), asha: ago(200) } }],
     messages: [
       { id: "m1", convo: "k1", from: "olivia", body: "Hi Asha! You're on the Friday lineup. Sound check at 6:30?", at: ago(30) },
       { id: "m2", convo: "k1", from: "asha", body: "Amazing, thank you! 6:30 works. Is there a power strip near the stage for my loop pedal?", at: ago(25) },
@@ -465,45 +479,119 @@ function seed() {
       { id: "n6", to: "olivia", actor: "meera", type: "application.submitted", gig: "feature", at: ago(900), read: false },
       { id: "n7", to: "olivia", actor: "dev", type: "application.submitted", gig: "feature", at: ago(600), read: false },
       { id: "n8", to: "olivia", actor: "asha", type: "post.reposted", post: "p1", at: ago(30), read: false },
-    ], n: 100 };
+    ],
+  };
 }
-let S;
-try { S = JSON.parse(localStorage.getItem("equra-demo-v4")); } catch { S = null; }
-if (!S || S.v !== 4) S = seed();
-const save = () => { try { localStorage.setItem("equra-demo-v4", JSON.stringify(S)); } catch {} };
-const uid = (p) => `${p}${++S.n}`;
-const now = () => new Date().toISOString();
-const ui = { tab: "gigs", stack: [], sheet: null, filter: "all", q: "", scene: "following", mine: null, reviewIdx: 0, toast: null, typing: null, confirm: null, draft: null, playing: null };
+
+/* ======================= Store: live shared db, or offline on-device ======================= */
+const COLS = ["people", "events", "gigs", "apps", "bookings", "posts", "likes", "comments", "follows", "convos", "messages", "notifs"];
+const MAPS = { people: "users", events: "events" };
+const S = { users: {}, events: {}, gigs: [], apps: [], bookings: [], posts: [], likes: [], comments: [], follows: [], convos: [], messages: [], notifs: [] };
+const ui = { tab: "gigs", stack: [], sheet: null, filter: "all", q: "", scene: "following", mine: null, reviewIdx: 0, toast: null, confirm: null, draft: null, playing: null };
+const store = { mode: "starting", db: null, user: null, myId: null, canWrite: true, isOwner: false, loaded: new Set() };
+const LOCAL_KEY = "equra-offline-v1";
+const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+let viewer = lsGet("equra-acting-as") || "asha";
+
+function apply(col, rows) {
+  if (MAPS[col]) S[MAPS[col]] = Object.fromEntries(rows.map((r) => [r.id, r]));
+  else S[col] = rows;
+}
+function rowsOf(col) { return MAPS[col] ? Object.values(S[MAPS[col]]) : S[col]; }
+function saveOffline() { lsSet(LOCAL_KEY, JSON.stringify(Object.fromEntries(COLS.map((c) => [c, rowsOf(c)])))); }
+function startOffline() {
+  store.mode = "offline";
+  store.myId = lsGet("equra-my-id") || rid("u_");
+  lsSet("equra-my-id", store.myId);
+  let data = null;
+  try { data = JSON.parse(lsGet(LOCAL_KEY)); } catch {}
+  data = data && data.people ? data : seed();
+  COLS.forEach((c) => apply(c, data[c] || []));
+  render(true);
+}
+let renderQueued = false;
+function queueRender() { if (!renderQueued) { renderQueued = true; requestAnimationFrame(() => { renderQueued = false; render(); }); } }
+
+async function startLive() {
+  const db = await claude.use("db");
+  if (!db) return startOffline();
+  const user = await claude.use("user");
+  store.db = db; store.user = user; store.mode = "live";
+  if (user) {
+    store.myId = await user.id();
+    store.isOwner = await user.isOwner();
+    const w = await user.can("data.write");
+    store.canWrite = w !== false;
+  }
+  if (viewer === "me" && !store.myId) viewer = "visitor";
+  COLS.forEach((col) => db.collection(col).onSnapshot(
+    (snap) => { apply(col, snap.docs.map((d) => structuredClone(d.data()))); store.loaded.add(col); queueRender(); },
+    (e) => { if (e.code === "revoked") { store.mode = "revoked"; queueRender(); } },
+  ));
+  render(true);
+}
+
+/** Persist one row. Updates local state first (instant UI), then writes. */
+async function put(col, row) {
+  const rows = rowsOf(col).filter((r) => r.id !== row.id);
+  apply(col, [...rows, row]);
+  if (store.mode !== "live") return saveOffline();
+  try { await store.db.collection(col).doc(row.id).set(JSON.parse(JSON.stringify(row))); }
+  catch (e) { writeFailed(e); }
+}
+async function drop(col, id) {
+  apply(col, rowsOf(col).filter((r) => r.id !== id));
+  if (store.mode !== "live") return saveOffline();
+  try { await store.db.collection(col).doc(id).delete(); } catch (e) { writeFailed(e); }
+}
+function writeFailed(e) {
+  if (e?.code === "invalid_argument") { store.canWrite = false; toast("You can look around, but changes need Editor access. Ask the owner to invite you as an Editor.", true); }
+  else if (e?.code === "quota_exceeded") toast("EQura's demo database is full. Ask the owner to reset it.", true);
+  else toast("Couldn't save that. Check your connection and try again.", true);
+}
+async function resetData() {
+  const fresh = seed();
+  if (store.mode === "live") {
+    for (const col of COLS) for (const r of rowsOf(col)) if (!fresh[col].some((f) => f.id === r.id) && !(col === "people" && !r.demo)) await store.db.collection(col).doc(r.id).delete();
+    for (const col of COLS) for (const r of fresh[col]) await store.db.collection(col).doc(r.id).set(r);
+  } else { const mine = Object.values(S.users).filter((u) => !u.demo); COLS.forEach((c) => apply(c, c === "people" ? [...fresh.people, ...mine] : fresh[c])); saveOffline(); }
+}
 
 /* ======================= Rules (mirror backend services) ======================= */
-const me = () => S.viewer === "visitor" ? null : S.users[S.viewer];
+const rid = (p) => `${p}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+const now = () => new Date().toISOString();
+const me = () => viewer === "visitor" ? null : viewer === "me" ? S.users[store.myId] || null : S.users[viewer] || null;
 const user = (id) => S.users[id];
 const gig = (id) => S.gigs.find((g) => g.id === id);
-const has = (r) => !!me()?.roles.includes(r);
+const has = (r) => !!me()?.roles?.includes(r);
 const manages = (g) => !!me() && g.owner === me().id;
 const open = (g) => g.status === "published" && new Date(g.deadline) > new Date();
 const booked = (g) => S.bookings.filter((b) => b.gig === g.id && b.status === "confirmed").length;
 const myApp = (g) => me() && S.apps.find((a) => a.gig === g.id && a.user === me().id);
 class Rule extends Error {}
+function guardWrite() { if (!store.canWrite) throw new Rule("You can look around, but changes need Editor access from the owner."); }
 function notify(to, actor, type, extra = {}) {
-  if (to === actor) return;
+  if (to === actor || !to) return;
   if (type === "message.received") {
     const ex = S.notifs.find((n) => n.to === to && n.type === type && n.convo === extra.convo);
-    if (ex) return Object.assign(ex, { at: now(), read: false, actor });
+    if (ex) return put("notifs", { ...ex, at: now(), read: false, actor });
   }
-  S.notifs.push({ id: uid("n"), to, actor, type, at: now(), read: false, ...extra });
+  put("notifs", { id: rid("n"), to, actor, type, at: now(), read: false, ...extra });
 }
-function apply(gigId, note, items) {
+function applyTo(gigId, note, items) {
+  guardWrite();
   const g = gig(gigId), u = me();
   if (!has("artist")) throw new Rule("Add the artist role to apply.");
   if (manages(g)) throw new Rule("You can't apply to your own gig.");
   if (!open(g)) throw new Rule("This gig isn't taking applications any more.");
   if (myApp(g)) throw new Rule("You've already applied to this gig.");
-  S.apps.push({ id: uid("a"), gig: gigId, user: u.id, status: "submitted", note, items, at: now() });
+  put("apps", { id: `${gigId}__${u.id}`, gig: gigId, user: u.id, status: "submitted", note, items, at: now() });
   notify(g.owner, u.id, "application.submitted", { gig: gigId });
 }
 const MOVES = { submitted: ["shortlisted", "accepted", "declined"], shortlisted: ["accepted", "declined"] };
 function move(appId, to) {
+  guardWrite();
   const a = S.apps.find((x) => x.id === appId), g = gig(a.gig), u = me();
   if (a.status === to) return;
   if (to === "withdrawn") {
@@ -513,43 +601,38 @@ function move(appId, to) {
     if (!(MOVES[a.status] || []).includes(to)) throw new Rule(`A ${a.status} application can't be changed to ${to}.`);
     if (to === "accepted" && booked(g) >= g.capacity) throw new Rule("Every spot is booked.");
   }
-  a.status = to;
-  if (to === "accepted") S.bookings.push({ id: uid("b"), app: a.id, gig: g.id, user: a.user, status: "confirmed" });
+  put("apps", { ...a, status: to, decidedAt: now() });
+  if (to === "accepted") put("bookings", { id: `b_${a.id}`, app: a.id, gig: g.id, user: a.user, status: "confirmed", celebrated: false, at: now() });
   notify(to === "withdrawn" ? g.owner : a.user, u.id, `application.${to}`, { gig: g.id });
 }
 function cancelBooking(id) {
+  guardWrite();
   const b = S.bookings.find((x) => x.id === id), g = gig(b.gig), u = me();
   if (b.status !== "confirmed") throw new Rule("Only confirmed bookings can be cancelled.");
-  b.status = "cancelled";
+  put("bookings", { ...b, status: "cancelled" });
   notify(u.id === b.user ? g.owner : b.user, u.id, "booking.cancelled", { gig: g.id });
 }
 function convoWith(otherId, gigId) {
-  const u = me();
+  const u = me(), key = [u.id, otherId].sort().join("__");
   let c = S.convos.find((k) => k.users.includes(u.id) && k.users.includes(otherId));
-  if (!c) { c = { id: uid("k"), users: [u.id, otherId], read: {}, gig: gigId || null }; S.convos.push(c); }
-  else if (gigId) c.gig = gigId;
+  if (!c) { c = { id: key, users: [u.id, otherId], read: {}, gig: gigId || null }; put("convos", c); }
+  else if (gigId && c.gig !== gigId) { c = { ...c, gig: gigId }; put("convos", c); }
   return c;
 }
-const REPLIES = { olivia: ["Sounds great. See you Friday!", "Noted, I'll add it to the run sheet.", "Perfect. Ping me if anything changes."],
-  rohan: ["Thanks! I'll get back to you once the lineup is set.", "Got it. Could you send a recent live clip?"],
-  meera: ["Yes! Let's pick a song this week.", "Coffee before sound check?"], kabir: ["See you on the rooftop.", "Sending you my latest mix."],
-  dev: ["We're in. Drummer says hi.", "Let's jam sometime!"], asha: ["Thank you so much!", "Can't wait. I'll be there early."] };
-function send(convoId, body) {
-  const c = S.convos.find((k) => k.id === convoId), u = me(), other = c.users.find((x) => x !== u.id);
-  S.messages.push({ id: uid("m"), convo: c.id, from: u.id, body, at: now() });
-  c.read[u.id] = now();
-  notify(other, u.id, "message.received", { convo: c.id });
-  ui.typing = c.id;
-  setTimeout(() => {
-    const pool = REPLIES[other] || ["Thanks!"];
-    S.messages.push({ id: uid("m"), convo: c.id, from: other, body: pool[Math.floor(Math.random() * pool.length)], at: now() });
-    notify(u.id, other, "message.received", { convo: c.id });
-    ui.typing = null;
-    const r = cur();
-    if (r.name === "thread" && r.id === c.id && S.viewer === u.id) c.read[u.id] = now();
-    render();
-  }, 1700);
+function markRead(convoId) {
+  const u = me(), c = S.convos.find((k) => k.id === convoId);
+  if (!u || !c || !store.canWrite) return;
+  put("convos", { ...c, read: { ...c.read, [u.id]: now() } });
+  S.notifs.filter((n) => n.to === u.id && n.convo === convoId && !n.read).forEach((n) => put("notifs", { ...n, read: true }));
 }
+function send(convoId, body) {
+  guardWrite();
+  const c = S.convos.find((k) => k.id === convoId), u = me(), other = c.users.find((x) => x !== u.id);
+  put("messages", { id: rid("m"), convo: c.id, from: u.id, body, at: now() });
+  put("convos", { ...c, read: { ...c.read, [u.id]: now() } });
+  notify(other, u.id, "message.received", { convo: c.id });
+}
+const unreadIn = (c, u) => S.messages.filter((m) => m.convo === c.id && m.from !== u.id && (!c.read?.[u.id] || m.at > c.read[u.id])).length;
 
 /* ======================= Formatting ======================= */
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -571,13 +654,15 @@ function ago2(iso) {
   const s = Math.max(1, (Date.now() - new Date(iso)) / 1000);
   if (s < 60) return "now"; if (s < 3600) return `${Math.round(s / 60)}m`; if (s < 86400) return `${Math.round(s / 3600)}h`; return `${Math.round(s / 86400)}d`;
 }
-const money = (g) => g.comp === "paid" && g.amount ? `₹${g.amount.toLocaleString("en-IN")}` : { unpaid: "Unpaid", revenue_share: "Door split", negotiable: "Negotiable", paid: "Paid" }[g.comp];
+const money = (g) => g.comp === "paid" && g.amount ? `₹${Number(g.amount).toLocaleString("en-IN")}` : { unpaid: "Unpaid", revenue_share: "Door split", negotiable: "Negotiable", paid: "Paid" }[g.comp];
 const TYPE = { open_mic_slot: "Open mic", paid_gig: "Paid gig", audition: "Audition", band_slot: "Band slot", dj_slot: "DJ slot", host_role: "Host / MC" };
+const nm = (id) => user(id)?.name || "Someone";
+const first = (id) => nm(id).split(" ")[0];
 
 /* Generative screen prints. Inks from the genre; one of four compositions from the id. */
 const INK = { folk: ["--orange", "--blue"], acoustic: ["--yellow", "--orange"], indie: ["--pink", "--teal"], jazz: ["--blue", "--yellow"], soul: ["--orange", "--pink"],
   electronic: ["--pink", "--blue"], rock: ["--pink", "--yellow"], theatre: ["--yellow", "--pink"], _: ["--teal", "--orange"] };
-function hash(s) { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; }
+function hash(s) { let h = 2166136261; for (const c of String(s)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; }
 function cover(id, genre, force) {
   const [a, b] = INK[genre] || INK._, h = hash(id), kind = force ?? h % 4;
   const x = 20 + (h % 55), y = 18 + ((h >> 5) % 50), r = 34 + ((h >> 9) % 26), ang = (h >> 3) % 180, A = `var(${a})`, B = `var(${b})`;
@@ -587,12 +672,13 @@ function cover(id, genre, force) {
   if (kind === 2) return `background:radial-gradient(circle at ${60 + (h % 20)}% ${55 + (h % 15)}%, ${B} 0 9%, ${A} 9.5% 11%, transparent 11.5%),repeating-radial-gradient(circle at ${60 + (h % 20)}% ${55 + (h % 15)}%, ${darkA} 0 3px, ${A} 3px 7px)`;
   return `background:linear-gradient(${120 + (h % 60)}deg, transparent 0 46%, ${B} 46% 62%, transparent 62%),radial-gradient(circle at ${x}% ${y + 10}%, ${lightA} 0 ${r - 4}%, transparent ${r - 3.5}%),${A}`;
 }
+const INKS = ["--pink", "--blue", "--teal", "--orange", "--yellow"];
 function av(id, size = "") {
   const u = user(id); const ini = (u?.name || "?").split(/\s+/).filter((w) => /\w/.test(w)).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
-  return `<span class="av ${size} cover" style="background:var(${u?.ink || "--teal"})" aria-hidden="true"><span>${esc(ini)}</span></span>`;
+  return `<span class="av ${size} cover" style="background:var(${u?.ink || INKS[hash(id) % INKS.length]})" aria-hidden="true"><span>${esc(ini)}</span></span>`;
 }
 const eqBars = (cls = "") => `<span class="eq ${cls}" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>`;
-const P = {
+const PATHS = {
   gigs: "M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm12-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z", scene: "M4 6h16M4 12h16M4 18h10",
   mine: "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm4 10 2 2 4-4",
   inbox: "M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z", user: "M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z",
@@ -600,18 +686,18 @@ const P = {
   heart: "M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3C14.7 3 13.5 3.5 12 5c-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7Z",
   comment: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z", repost: "m17 1 4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4m14-2v2a4 4 0 0 1-4 4H3",
   share: "M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13", back: "M15 18l-6-6 6-6", plus: "M12 5v14M5 12h14", check: "M20 6 9 17l-5-5", x: "M18 6 6 18M6 6l12 12",
-  pin: "M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11Zm0-8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z", search: "m21 21-4.3-4.3M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z",
+  search: "m21 21-4.3-4.3M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z",
   play: "M7 4v16l13-8z", pause: "M7 4h4v16H7zM14 4h4v16h-4z", send: "M5 12h14M13 6l6 6-6 6", star: "m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z",
   left: "M15 18l-6-6 6-6", right: "m9 18 6-6-6-6", edit: "M12 20h9M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4Z",
 };
-const ic = (n, s = 22, fill = false) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="${fill ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${P[n]}"/></svg>`;
+const ic = (n, s = 22, fill = false) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="${fill ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${PATHS[n]}"/></svg>`;
 const st = (s, text) => `<span class="state ${s}">${text || ({ accepted: "Booked", submitted: "Applied", declined: "Not selected", confirmed: "Booked" }[s] || s)}</span>`;
 
 /* ======================= Navigation ======================= */
 const cur = () => ui.stack.at(-1) || { name: ui.tab };
 function go(name, p = {}) { ui.stack.push({ name, ...p }); ui.sheet = null; ui.confirm = null; render(true); }
-function back() { ui.stack.pop(); ui.sheet = null; render(true); }
-function toast(text, bad = false) { ui.toast = { text, bad }; render(); clearTimeout(toast.t); toast.t = setTimeout(() => { ui.toast = null; render(); }, 2800); }
+function back() { const r = cur(); if (r.name === "thread") markRead(r.id); ui.stack.pop(); ui.sheet = null; render(true); }
+function toast(text, bad = false) { ui.toast = { text, bad }; render(); clearTimeout(toast.t); toast.t = setTimeout(() => { ui.toast = null; render(); }, 3200); }
 const unreadAlerts = () => me() ? S.notifs.filter((n) => n.to === me().id && !n.read && n.type !== "message.received").length : 0;
 function bell() { const n = unreadAlerts(); return `<button class="icon-btn" data-a="go" data-id="alerts" aria-label="Notifications${n ? `, ${n} unread` : ""}">${ic("bell")}${n ? `<span class="badge">${n > 9 ? "9+" : n}</span>` : ""}</button>`; }
 const bigHead = (title, sub = "", right = "") => `<header class="head"><div class="head-row"><div class="title display">${title}</div>${right}</div>${sub ? `<div class="sub">${sub}</div>` : ""}</header>`;
@@ -621,7 +707,7 @@ const emptyState = (title, text = "", action = "") => `<div class="empty">${eqBa
 /* ======================= Components ======================= */
 function matchReason(g) {
   const u = me(); if (!u) return "";
-  const m = g.genres.find((x) => u.genres.includes(x));
+  const m = g.genres.find((x) => (u.genres || []).includes(x));
   return m ? `<span class="tag match">${ic("star", 11, true)} Matches #${m}</span>` : "";
 }
 const thumb = (g, size = 68) => `<span class="thumb cover" style="${cover(g.id, g.genres[0])};width:${size}px;height:${size}px;${size < 60 ? "border-radius:12px" : ""}"><span class="d" style="${size < 60 ? "font-size:22px" : ""}">${dayNum(g.starts)}</span><span class="m">${mon(g.starts)}</span></span>`;
@@ -669,30 +755,30 @@ function meter(g) {
   const n = Math.min(g.capacity, 12), bk = booked(g);
   return `<div class="meter" aria-hidden="true">${Array.from({ length: n }, (_, i) => `<i class="${i < bk ? "on" : ""}" style="height:${40 + ((i * 37) % 60)}%"></i>`).join("")}</div>`;
 }
-function player(w, owner) {
+function player(w) {
   const on = ui.playing === w.id, bars = Array.from({ length: 28 }, (_, i) => 20 + ((hash(w.id + i) % 80)));
   return `<button class="player ${on ? "playing" : ""}" data-a="play" data-id="${w.id}" aria-pressed="${on}" aria-label="${on ? "Pause" : "Play"} ${esc(w.title)}">
     <span class="play">${ic(on ? "pause" : "play", 18, true)}</span>
     <span class="col" style="gap:0;min-width:0"><b class="small ellipsis">${esc(w.title)}</b><span class="tiny muted ellipsis">${esc(w.sub)}</span>
       <span class="wave">${bars.map((h, i) => `<i style="height:${h}%;animation-delay:${(i % 7) * 0.09}s"></i>`).join("")}</span></span>
-    <span class="tag">${on ? "Preview" : w.type}</span></button>`;
+    <span class="tag">${on ? "Preview" : esc(w.type)}</span></button>`;
 }
 function gigLink(x) {
-  const g = gig(x.gig);
+  const g = gig(x.gig); if (!g) return "";
   return `<button class="context" style="margin-top:8px" data-a="gig" data-id="${g.id}">${thumb(g, 42)}
     <span class="col grow" style="gap:0"><b class="small ellipsis">${esc(g.title)}</b><span class="tiny muted">${open(g) ? `${esc(closes(g.deadline))} · Tap to apply` : "Applications closed"}</span></span>${ic("right", 18)}</button>`;
 }
 function postView(p) {
   const u = me(), orig = p.repostOf ? S.posts.find((x) => x.id === p.repostOf) : null, plain = orig && !p.body;
   const author = plain ? orig.author : p.author;
-  const likes = S.likes.filter((l) => l[1] === p.id).length, liked = !!u && S.likes.some((l) => l[0] === u.id && l[1] === p.id);
+  const likes = S.likes.filter((l) => l.post === p.id).length, liked = !!u && S.likes.some((l) => l.user === u.id && l.post === p.id);
   const cc = S.comments.filter((c) => c.post === p.id).length;
   const content = orig && !plain
-    ? `<p class="pre">${esc(p.body)}</p><div class="quote"><div class="row small" style="gap:8px">${av(orig.author, "sm")}<b>${esc(user(orig.author).name)}</b></div><p class="pre">${esc(orig.body)}</p>${orig.gig ? gigLink(orig) : ""}</div>`
+    ? `<p class="pre">${esc(p.body)}</p><div class="quote"><div class="row small" style="gap:8px">${av(orig.author, "sm")}<b>${esc(nm(orig.author))}</b></div><p class="pre">${esc(orig.body)}</p>${orig.gig ? gigLink(orig) : ""}</div>`
     : `<p class="pre">${esc((orig || p).body)}</p>${(orig || p).gig ? gigLink(orig || p) : ""}`;
-  return `<article class="post"><button data-a="profile" data-id="${author}" aria-label="${esc(user(author).name)}">${av(author)}</button>
-    <div style="min-width:0">${plain ? `<div class="tiny faint row" style="gap:5px;margin-bottom:2px">${ic("repost", 13)} ${esc(user(p.author).name)} reposted</div>` : ""}
-      <div class="row" style="gap:6px"><span class="name ellipsis">${esc(user(author).name)}</span><span class="faint small">${ago2(p.at)}</span></div>${content}
+  return `<article class="post"><button data-a="profile" data-id="${author}" aria-label="${esc(nm(author))}">${av(author)}</button>
+    <div style="min-width:0">${plain ? `<div class="tiny faint row" style="gap:5px;margin-bottom:2px">${ic("repost", 13)} ${esc(nm(p.author))} reposted</div>` : ""}
+      <div class="row" style="gap:6px"><span class="name ellipsis">${esc(nm(author))}</span><span class="faint small">${ago2(p.at)}</span></div>${content}
       <div class="post-acts">
         <button class="${liked ? "on" : ""}" data-a="like" data-id="${p.id}" aria-label="Like" aria-pressed="${liked}">${ic("heart", 18, liked)}${likes || ""}</button>
         <button data-a="post" data-id="${p.id}" aria-label="Comments">${ic("comment", 18)}${cc || ""}</button>
@@ -704,26 +790,26 @@ function postView(p) {
 const screens = {
   gigs() {
     const u = me();
-    const mine = u ? S.bookings.filter((b) => b.user === u.id && b.status === "confirmed") : [];
-    const fresh = mine.find((b) => !S.celebrated.includes(b.id));
+    const mine = u ? S.bookings.filter((b) => b.user === u.id && b.status === "confirmed" && gig(b.gig)) : [];
+    const fresh = mine.find((b) => !b.celebrated);
     const next = mine.map((b) => gig(b.gig)).sort((x, y) => x.starts.localeCompare(y.starts))[0];
     const live = S.gigs.filter(open);
-    const wall = u ? live.filter((g) => !manages(g) && !myApp(g)).sort((a, b) => (b.genres.some((x) => u.genres.includes(x))) - (a.genres.some((x) => u.genres.includes(x)))) : live;
+    const wall = u ? live.filter((g) => !manages(g) && !myApp(g)).sort((a, b) => (b.genres.some((x) => (u.genres || []).includes(x))) - (a.genres.some((x) => (u.genres || []).includes(x)))) : live;
     const q = ui.q.trim().toLowerCase();
     const list = live.filter((g) => (ui.filter === "all" || (ui.filter === "week" ? inDays(g.starts) <= 7 : ui.filter === "paid" ? g.comp === "paid" : g.type === ui.filter))
       && (!q || `${g.title} ${g.venue} ${g.area} ${g.desc} ${g.genres.join(" ")}`.toLowerCase().includes(q))).sort((a, b) => a.starts.localeCompare(b.starts));
     const filters = [["all", "All"], ["week", "This week"], ["paid", "Paid"], ["open_mic_slot", "Open mics"], ["audition", "Auditions"], ["dj_slot", "DJ"], ["band_slot", "Bands"]];
-    const ticker = live.sort((a, b) => a.starts.localeCompare(b.starts)).map((g) => `<span>${wk(g.starts)} ${dot(g.starts)} · ${esc(g.venue)} · ${esc(g.title)} · ${money(g)}</span>`).join("");
-    const right = `${u && has("organizer") ? `<button class="icon-btn" data-a="go" data-id="newgig" aria-label="Post a gig">${ic("plus")}</button>` : ""}${u ? bell() : `<button class="btn sm pink" data-a="as" data-id="asha">Sign in</button>`}`;
+    const ticker = [...live].sort((a, b) => a.starts.localeCompare(b.starts)).map((g) => `<span>${wk(g.starts)} ${dot(g.starts)} · ${esc(g.venue)} · ${esc(g.title)} · ${money(g)}</span>`).join("");
+    const right = `${u && has("organizer") ? `<button class="icon-btn" data-a="go" data-id="newgig" aria-label="Post a gig">${ic("plus")}</button>` : ""}${u ? bell() : ""}`;
     return `<header class="head"><div class="head-row"><span class="logo" style="font-size:38px;flex:1">${eqBars()}EQura</span>${right}</div>
-        <div class="sub">${u ? `Hey ${esc(u.name.split(" ")[0])}. ${live.length} stages open near ${esc(u.city)}.` : "Every artist deserves a stage."}</div></header>
-      <div class="marquee" aria-label="Upcoming gigs"><div class="run">${ticker}${ticker}</div></div>
+        <div class="sub">${u ? `Hey ${esc(u.name.split(" ")[0])}. ${live.length} stages open near ${esc(u.city || "you")}.` : "Every artist deserves a stage."}</div></header>
+      ${ticker ? `<div class="marquee" aria-label="Upcoming gigs"><div class="run">${ticker}${ticker}</div></div>` : ""}
       <div class="page" style="padding-top:20px">
-      ${fresh ? (() => { const g = gig(fresh.gig); return `<div class="celebrate"><span class="rays" aria-hidden="true"></span>${eqBars()}<span class="eyebrow" style="color:#fff">${esc(user(g.owner).name)} just booked you</span>
+      ${fresh ? (() => { const g = gig(fresh.gig); return `<div class="celebrate"><span class="rays" aria-hidden="true"></span>${eqBars()}<span class="eyebrow" style="color:#fff">${esc(nm(g.owner))} just booked you</span>
         <span class="display">You're on!</span><span class="small" style="color:#fff">${esc(g.title)} · ${esc(g.venue)} · ${wk(g.starts)} ${dayNum(g.starts)} ${mon(g.starts)}, ${time(g.starts)}</span>
         <span class="row" style="width:100%;margin-top:6px"><button class="btn pink sm grow" data-a="message" data-id="${g.owner}" data-gig="${g.id}">Say thanks</button><button class="btn sm grow" style="background:#fff;color:#141118" data-a="celebrated" data-id="${fresh.id}">See my ticket</button></span></div>`; })() : ""}
       ${!u ? `<div class="celebrate" style="padding:26px 18px"><span class="rays" aria-hidden="true"></span><span class="eyebrow" style="color:#fff">Open mics · paid gigs · auditions</span>
-        <span class="display" style="font-size:56px">Find your next stage</span><span class="row" style="width:100%;margin-top:8px"><button class="btn pink sm grow" data-a="as" data-id="asha">I perform</button><button class="btn sm grow" style="background:#fff;color:#141118" data-a="as" data-id="olivia">I host gigs</button></span></div>` : ""}
+        <span class="display" style="font-size:56px">Find your next stage</span><span class="row" style="width:100%;margin-top:8px">${store.myId && store.canWrite ? `<button class="btn pink sm grow" data-a="becomeme">Create my profile</button>` : ""}<button class="btn sm grow" style="background:#fff;color:#141118" data-a="as" data-id="asha">Try as Asha</button></span></div>` : ""}
       ${next && !fresh ? ticket(next) : ""}
       ${wall.length ? `<section class="section"><div class="section-head"><h3>${u ? "On the wall for you" : "On the wall"}</h3><span class="marker" style="color:var(--yellow);font-size:15px;transform:rotate(-4deg)">${u ? "picked from your sound" : "fresh this week"}</span></div>
         <div class="wall">${wall.map((g, i) => flyer(g, i)).join("")}</div></section>` : ""}
@@ -735,7 +821,8 @@ const screens = {
   },
 
   gig({ id }) {
-    const g = gig(id), u = me(), ev = g.event && S.events[g.event], a = myApp(g), host = user(g.owner), mg = manages(g);
+    const g = gig(id); if (!g) return bar("Gig") + emptyState("Gig not found");
+    const u = me(), ev = g.event && S.events[g.event], a = myApp(g), host = user(g.owner) || { id: g.owner, name: "Host", headline: "", shows: 0 }, mg = manages(g);
     const b = a && S.bookings.find((x) => x.app === a.id);
     let cta;
     if (mg) { const pending = S.apps.filter((x) => x.gig === g.id && ["submitted", "shortlisted"].includes(x.status)).length;
@@ -756,10 +843,10 @@ const screens = {
         <p class="pre" style="margin:0;font-size:17px">${esc(g.desc)}</p>
         ${g.provides.length ? `<section class="section"><span class="eyebrow">The venue provides</span><ul class="checklist">${g.provides.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></section>` : ""}
         ${g.bring.length ? `<section class="section"><span class="eyebrow">Bring</span><ul class="checklist">${g.bring.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></section>` : ""}
-        ${g.genres.length ? `<div class="row wrap" style="gap:6px">${g.genres.map((x) => `<span class="tag">#${x}</span>`).join("")}${matchReason(g)}</div>` : ""}
+        ${g.genres.length ? `<div class="row wrap" style="gap:6px">${g.genres.map((x) => `<span class="tag">#${esc(x)}</span>`).join("")}${matchReason(g)}</div>` : ""}
         <section class="section"><span class="eyebrow">Hosted by</span>
-          <div class="host"><button data-a="profile" data-id="${host.id}" aria-label="${esc(host.name)}">${av(host.id)}</button><button class="col grow" style="gap:0;text-align:left" data-a="profile" data-id="${host.id}"><b>${esc(host.name)}</b><span class="tiny muted">${esc(host.headline)} · ${host.shows} shows hosted</span></button>
-            ${mg ? "" : `<button class="btn sm line" data-a="message" data-id="${host.id}" data-gig="${g.id}">Message</button>`}</div></section>
+          <div class="host"><button data-a="profile" data-id="${host.id}" aria-label="${esc(host.name)}">${av(host.id)}</button><button class="col grow" style="gap:0;text-align:left" data-a="profile" data-id="${host.id}"><b>${esc(host.name)}</b><span class="tiny muted">${esc(host.headline)}${host.shows ? ` · ${host.shows} shows hosted` : ""}</span></button>
+            ${mg || !u ? "" : `<button class="btn sm line" data-a="message" data-id="${host.id}" data-gig="${g.id}">Message</button>`}</div></section>
       </div><div class="sticky-cta">${cta}</div>`;
   },
 
@@ -771,12 +858,12 @@ const screens = {
     const seg = both ? `<div class="seg" role="tablist">${[["playing", "Playing"], ["hosting", "Hosting"]].map(([k, t]) => `<button class="${view === k ? "on" : ""}" data-a="mineview" data-id="${k}" role="tab" aria-selected="${view === k}">${t}</button>`).join("")}</div>` : "";
     let body;
     if (view === "playing") {
-      const rows = S.apps.filter((a) => a.user === u.id).map((a) => ({ a, g: gig(a.gig), b: S.bookings.find((x) => x.app === a.id) }));
+      const rows = S.apps.filter((a) => a.user === u.id && gig(a.gig)).map((a) => ({ a, g: gig(a.gig), b: S.bookings.find((x) => x.app === a.id) }));
       const isBooked = (r) => r.a.status === "accepted" && r.b?.status === "confirmed";
       const upcoming = rows.filter(isBooked).sort((x, y) => x.g.starts.localeCompare(y.g.starts));
       const review = rows.filter((r) => ["submitted", "shortlisted"].includes(r.a.status)).sort((x, y) => (y.a.status === "shortlisted") - (x.a.status === "shortlisted"));
       const done = rows.filter((r) => !isBooked(r) && !review.includes(r));
-      const card = (r) => { const { a, g, b } = r, host = user(g.owner).name.split(" ")[0];
+      const card = (r) => { const { a, g, b } = r, host = first(g.owner);
         let foot = "";
         if (isBooked(r)) foot = ui.confirm === b.id
           ? `<div class="col"><span class="small">Cancel this booking? ${esc(host)} will be told right away and the spot reopens.</span><div class="row"><button class="btn sm bad grow" data-a="cancelbooking" data-id="${b.id}">Cancel booking</button><button class="btn sm line grow" data-a="keep">Keep it</button></div></div>`
@@ -802,7 +889,7 @@ const screens = {
 
   review({ id }) {
     const g = gig(id);
-    if (!manages(g)) return bar("Applicants") + emptyState("Hosts only", "Only this gig's host can see who applied.");
+    if (!g || !manages(g)) return bar("Applicants") + emptyState("Hosts only", "Only this gig's host can see who applied.");
     const all = S.apps.filter((a) => a.gig === id);
     const pending = all.filter((a) => ["submitted", "shortlisted"].includes(a.status)).sort((x, y) => (y.status === "shortlisted") - (x.status === "shortlisted") || x.at.localeCompare(y.at));
     const decided = all.filter((a) => !pending.includes(a)), full = booked(g) >= g.capacity;
@@ -810,12 +897,13 @@ const screens = {
     const head = `<div class="col" style="gap:8px"><div class="row" style="justify-content:space-between"><span class="eyebrow">${full ? "Fully booked" : "Spots booked"}</span><b class="mono">${booked(g)} / ${g.capacity}</b></div>${meter(g)}</div>`;
     let deck = emptyState("All caught up", full ? "Every spot is booked." : "No one is waiting for a decision.");
     if (a) {
-      const u = user(a.user), items = a.items.map((pid) => u.portfolio.find((p) => p.id === pid)).filter(Boolean), overlap = u.genres.filter((x) => g.genres.includes(x));
+      const u = user(a.user) || { id: a.user, name: "Artist", headline: "", shows: 0, genres: [], portfolio: [] };
+      const items = (a.items || []).map((pid) => (u.portfolio || []).find((p) => p.id === pid)).filter(Boolean), overlap = (u.genres || []).filter((x) => g.genres.includes(x));
       deck = `<div class="deck"><div class="top">
-        <div class="row"><button data-a="profile" data-id="${u.id}" aria-label="${esc(u.name)}">${av(u.id)}</button><button class="col grow" style="gap:0;text-align:left" data-a="profile" data-id="${u.id}"><b style="font-size:17px">${esc(u.name)}</b><span class="tiny muted">${esc(u.headline)} · ${u.shows} shows</span></button>${st(a.status)}</div>
-        ${overlap.length ? `<div class="row wrap" style="gap:6px">${overlap.map((x) => `<span class="tag match">${ic("star", 11, true)} #${x}</span>`).join("")}</div>` : ""}
+        <div class="row"><button data-a="profile" data-id="${u.id}" aria-label="${esc(u.name)}">${av(u.id)}</button><button class="col grow" style="gap:0;text-align:left" data-a="profile" data-id="${u.id}"><b style="font-size:17px">${esc(u.name)}</b><span class="tiny muted">${esc(u.headline)}${u.shows ? ` · ${u.shows} shows` : ""}</span></button>${st(a.status)}</div>
+        ${overlap.length ? `<div class="row wrap" style="gap:6px">${overlap.map((x) => `<span class="tag match">${ic("star", 11, true)} #${esc(x)}</span>`).join("")}</div>` : ""}
         ${a.note ? `<div class="note pre">${esc(a.note)}</div>` : `<div class="small faint">No note.</div>`}
-        ${items.length ? `<div class="col" style="gap:8px"><span class="eyebrow">Listen before you book</span>${items.map((w) => player(w, u.id)).join("")}</div>` : ""}
+        ${items.length ? `<div class="col" style="gap:8px"><span class="eyebrow">Listen before you book</span>${items.map(player).join("")}</div>` : ""}
         <div class="tiny faint">Applied ${ago2(a.at)} ago</div></div>
         ${full ? `<div style="padding:0 18px"><div class="banner full">${ic("check", 18)}<span><b>Fully booked.</b> To book ${esc(u.name.split(" ")[0])}, cancel a booking or add spots first.</span></div></div>` : ""}
         <div class="actions"><button class="btn bad sm" data-a="decide" data-id="${a.id}" data-to="declined">Pass</button>
@@ -826,7 +914,7 @@ const screens = {
           <button class="btn sm line" data-a="ridx" data-id="${i + 1}" ${i >= pending.length - 1 ? "disabled" : ""} aria-label="Next applicant">${ic("right", 16)}</button></div>`;
     }
     return bar(esc(g.title)) + `<div class="page" style="padding-top:14px">${head}${deck}
-      ${decided.length ? `<section class="section" style="gap:0"><span class="eyebrow">Decided</span>${decided.map((d) => `<div class="list-row">${av(d.user, "sm")}<span class="grow">${esc(user(d.user).name)}</span>${st(d.status)}
+      ${decided.length ? `<section class="section" style="gap:0"><span class="eyebrow">Decided</span>${decided.map((d) => `<div class="list-row">${av(d.user, "sm")}<span class="grow">${esc(nm(d.user))}</span>${st(d.status)}
         ${d.status === "accepted" ? `<button class="btn sm line" data-a="message" data-id="${d.user}" data-gig="${g.id}">Message</button>` : ""}</div>`).join("")}</section>` : ""}</div>`;
   },
 
@@ -851,7 +939,7 @@ const screens = {
 
   scene() {
     const u = me(), tab = u ? ui.scene : "everyone";
-    const f = u ? new Set(S.follows.filter((x) => x[0] === u.id).map((x) => x[1]).concat(u.id)) : null;
+    const f = u ? new Set(S.follows.filter((x) => x.a === u.id).map((x) => x.b).concat(u.id)) : null;
     const list = S.posts.filter((p) => tab === "everyone" || f.has(p.author)).sort((a, b) => b.at.localeCompare(a.at));
     return bigHead("Scene", "What your people are up to", u ? bell() : "") + `<div class="page" style="gap:12px">
       ${u ? `<div class="seg">${[["following", "Following"], ["everyone", "Everyone"]].map(([k, t]) => `<button class="${tab === k ? "on" : ""}" data-a="sceneview" data-id="${k}" aria-pressed="${tab === k}">${t}</button>`).join("")}</div>
@@ -860,22 +948,23 @@ const screens = {
   },
 
   post({ id }) {
-    const p = S.posts.find((x) => x.id === id), list = S.comments.filter((c) => c.post === id);
+    const p = S.posts.find((x) => x.id === id); if (!p) return bar("Post") + emptyState("Post not found");
+    const list = S.comments.filter((c) => c.post === id).sort((a, b) => a.at.localeCompare(b.at));
     return bar("Post") + `<div class="page" style="padding-top:0;padding-bottom:90px;gap:14px">${postView(p)}<span class="eyebrow">Comments</span>
-      ${list.length ? list.map((c) => `<div class="row" style="align-items:flex-start">${av(c.user, "sm")}<div class="grow"><div class="small"><b>${esc(user(c.user).name)}</b> <span class="faint">${ago2(c.at)}</span></div><div class="pre">${esc(c.body)}</div></div></div>`).join("") : `<div class="small faint">Be the first to comment.</div>`}</div>
+      ${list.length ? list.map((c) => `<div class="row" style="align-items:flex-start">${av(c.user, "sm")}<div class="grow"><div class="small"><b>${esc(nm(c.user))}</b> <span class="faint">${ago2(c.at)}</span></div><div class="pre">${esc(c.body)}</div></div></div>`).join("") : `<div class="small faint">Be the first to comment.</div>`}</div>
       ${me() ? `<div class="composer"><input id="cbody" class="input" placeholder="Add a comment" maxlength="2000" aria-label="Comment"><button class="send" data-a="comment" data-id="${id}" aria-label="Post comment">${ic("send", 18)}</button></div>` : ""}`;
   },
 
   inbox() {
     const u = me();
     if (!u) return bigHead("Inbox") + signIn("message hosts and artists");
-    const list = S.convos.filter((c) => c.users.includes(u.id)).map((c) => { const ms = S.messages.filter((m) => m.convo === c.id);
-      return { c, last: ms.at(-1), unread: ms.filter((m) => m.from !== u.id && (!c.read[u.id] || m.at > c.read[u.id])).length }; })
+    const list = S.convos.filter((c) => c.users.includes(u.id)).map((c) => { const ms = S.messages.filter((m) => m.convo === c.id).sort((a, b) => a.at.localeCompare(b.at));
+      return { c, last: ms.at(-1), unread: unreadIn(c, u) }; })
       .sort((a, b) => (b.last?.at || "").localeCompare(a.last?.at || ""));
     return bigHead("Inbox", "", bell()) + `<div class="page" style="gap:0">${list.length ? list.map(({ c, last, unread }) => {
       const o = c.users.find((x) => x !== u.id), g = c.gig && gig(c.gig);
       return `<button class="list-row" data-a="thread" data-id="${c.id}">${av(o)}<span class="col grow" style="gap:1px">
-        <span class="row" style="gap:6px"><b class="grow ellipsis" style="font-weight:${unread ? 750 : 600}">${esc(user(o).name)}</b><span class="tiny faint">${last ? ago2(last.at) : ""}</span></span>
+        <span class="row" style="gap:6px"><b class="grow ellipsis" style="font-weight:${unread ? 750 : 600}">${esc(nm(o))}</b><span class="tiny faint">${last ? ago2(last.at) : ""}</span></span>
         ${g ? `<span class="tiny ellipsis" style="color:var(--pink);font-weight:650">${esc(g.title)}</span>` : ""}
         <span class="small ellipsis ${unread ? "" : "muted"}">${last ? (last.from === u.id ? "You: " : "") + esc(last.body) : "Say hello"}</span></span>${unread ? `<span class="count">${unread}</span>` : ""}</button>`;
     }).join("") : emptyState("No messages yet", "Message a host from any gig page.")}</div>`;
@@ -884,24 +973,22 @@ const screens = {
   thread({ id }) {
     const u = me(), c = S.convos.find((k) => k.id === id);
     if (!u || !c || !c.users.includes(u.id)) return bar("Chat") + emptyState("Not found");
-    c.read[u.id] = now();
-    S.notifs.filter((n) => n.to === u.id && n.convo === c.id).forEach((n) => (n.read = true));
     const o = c.users.find((x) => x !== u.id), g = c.gig && gig(c.gig), a = g && S.apps.find((x) => x.gig === g.id && c.users.includes(x.user) && x.user !== g.owner);
-    return bar(`<button class="row" style="gap:10px" data-a="profile" data-id="${o}">${av(o, "sm")}<span class="ellipsis">${esc(user(o).name)}</span></button>`) +
+    const msgs = S.messages.filter((m) => m.convo === id).sort((x, y) => x.at.localeCompare(y.at));
+    return bar(`<button class="row" style="gap:10px" data-a="profile" data-id="${o}">${av(o, "sm")}<span class="ellipsis">${esc(nm(o))}</span></button>`) +
       (g ? `<div style="padding:10px 14px 0"><button class="context" data-a="gig" data-id="${g.id}">${thumb(g, 42)}<span class="col grow" style="gap:0"><b class="small ellipsis">${esc(g.title)}</b><span class="tiny muted">${wk(g.starts)} ${time(g.starts)} · ${esc(g.venue)}</span></span>${a ? st(a.status) : ""}</button></div>` : "") +
-      `<div class="thread"><span class="day">Today</span>${S.messages.filter((m) => m.convo === id).map((m) => `<div class="bubble ${m.from === u.id ? "me" : "them"}">${esc(m.body)}</div>`).join("")}
-      ${ui.typing === id ? `<div class="typing" role="status" aria-label="${esc(user(o).name)} is typing">${eqBars()}</div>` : ""}</div>
-      <div class="composer"><input id="mbody" class="input" placeholder="Message ${esc(user(o).name.split(" ")[0])}" maxlength="5000" aria-label="Message"><button class="send" data-a="send" data-id="${id}" aria-label="Send">${ic("send", 18)}</button></div>`;
+      `<div class="thread">${msgs.length ? `<span class="day">${esc(nm(o))} · EQura</span>` : `<span class="day">Say hello to ${esc(first(o))}</span>`}${msgs.map((m) => `<div class="bubble ${m.from === u.id ? "me" : "them"}">${esc(m.body)}</div>`).join("")}</div>
+      <div class="composer"><input id="mbody" class="input" placeholder="Message ${esc(first(o))}" maxlength="2000" aria-label="Message"><button class="send" data-a="send" data-id="${id}" aria-label="Send">${ic("send", 18)}</button></div>`;
   },
 
   alerts() {
     const u = me();
     if (!u) return bar("Notifications") + signIn("see notifications");
     const list = S.notifs.filter((n) => n.to === u.id && n.type !== "message.received").sort((a, b) => b.at.localeCompare(a.at));
-    const text = (n) => { const w = `<b>${esc(user(n.actor)?.name || "Someone")}</b>`, g = n.gig ? `<b>${esc(gig(n.gig).title)}</b>` : "";
+    const text = (n) => { const w = `<b>${esc(nm(n.actor))}</b>`, g = n.gig && gig(n.gig) ? `<b>${esc(gig(n.gig).title)}</b>` : "a gig";
       return ({ "application.submitted": `${w} applied to ${g}`, "application.shortlisted": `You're shortlisted for ${g}`, "application.accepted": `You're booked for ${g}`,
         "application.declined": `${g} went to someone else this time`, "application.withdrawn": `${w} withdrew from ${g}`, "booking.cancelled": `${w} cancelled the booking for ${g}`,
-        "post.liked": `${w} liked your post`, "post.commented": `${w} commented on your post`, "post.reposted": `${w} reposted your post`, "user.followed": `${w} followed you` })[n.type] || n.type; };
+        "post.liked": `${w} liked your post`, "post.commented": `${w} commented on your post`, "post.reposted": `${w} reposted your post`, "user.followed": `${w} followed you` })[n.type] || esc(n.type); };
     const actionFor = (n) => ({ "application.submitted": "Review", "application.accepted": "Details", "application.shortlisted": "View", "user.followed": "View" })[n.type] || "";
     const group = (title, items) => items.length ? `<section class="section" style="gap:0"><span class="eyebrow" style="margin-bottom:4px">${title}</span>${items.map((n) => `<button class="list-row" data-a="notif" data-id="${n.id}" style="align-items:flex-start">
       ${av(n.actor, "sm")}<span class="grow small" style="color:${n.read ? "var(--ink-2)" : "var(--ink)"}">${text(n)}<span class="tiny faint" style="display:block">${ago2(n.at)} ago</span></span>
@@ -920,43 +1007,64 @@ function draftGig(d) {
     comp: d.comp, amount: Number(d.amount) || null, capacity: Math.max(1, Number(d.capacity) || 1), genres: [d.genre], type: d.type };
 }
 function profilePage(p, pushed) {
-  if (!p) return bigHead("Profile") + signIn("build your press kit");
-  const u = me(), self = u && u.id === p.id, following = !!u && S.follows.some((f) => f[0] === u.id && f[1] === p.id);
-  const followers = S.follows.filter((f) => f[1] === p.id).length;
+  if (!p) return bigHead("Profile") + (viewer === "me" ? onboardPrompt() : signIn("build your press kit"));
+  const u = me(), self = u && u.id === p.id, following = !!u && S.follows.some((f) => f.a === u.id && f.b === p.id);
+  const followers = S.follows.filter((f) => f.b === p.id).length;
   const bookedHere = S.bookings.filter((b) => b.user === p.id && b.status !== "cancelled").length;
   const posts = S.posts.filter((x) => x.author === p.id).sort((a, b) => b.at.localeCompare(a.at));
-  const upcoming = S.bookings.filter((b) => b.user === p.id && b.status === "confirmed").map((b) => gig(b.gig)).sort((a, b) => a.starts.localeCompare(b.starts));
+  const upcoming = S.bookings.filter((b) => b.user === p.id && b.status === "confirmed").map((b) => gig(b.gig)).filter(Boolean).sort((a, b) => a.starts.localeCompare(b.starts));
   const canBook = u && !self && has("organizer") && p.roles.includes("artist");
   return `${pushed ? `<div class="float" style="position:absolute"><button class="float-btn" data-a="back" aria-label="Back">${ic("back", 20)}</button><span></span></div>` : ""}
-    <div class="epk cover" style="${cover(p.id + "epk", p.genres[0], 1)}">
-      <div class="stickers">${p.genres.slice(0, 3).map((g, i) => `<span class="sticker" style="transform:rotate(${[8, -6, 4][i]}deg);background:var(${["--yellow", "--teal", "--orange"][i]})">#${g}</span>`).join("")}</div>
-      <span class="bill">${p.roles.includes("artist") ? "Live" : "Presented by"} · ${esc(p.city)}</span>
+    <div class="epk cover" style="${cover(p.id + "epk", (p.genres || [])[0], 1)}">
+      <div class="stickers">${(p.genres || []).slice(0, 3).map((g, i) => `<span class="sticker" style="transform:rotate(${[8, -6, 4][i]}deg);background:var(${["--yellow", "--teal", "--orange"][i]})">#${esc(g)}</span>`).join("")}</div>
+      <span class="bill">${p.roles.includes("artist") ? "Live" : "Presented by"}${p.city ? ` · ${esc(p.city)}` : ""}</span>
       <span class="name">${esc(p.name)}</span>
       <span class="bill">${esc(p.headline)}</span></div>
     <div class="page" style="padding-top:18px">
-      ${self ? "" : u ? `<div class="row">${canBook ? `<button class="btn sm pink grow" data-a="message" data-id="${p.id}">Invite to a gig</button>` : ""}<button class="btn sm ${following ? "line" : canBook ? "line" : "pink"} grow" data-a="follow" data-id="${p.id}" aria-pressed="${following}">${following ? "Following" : "Follow"}</button>${canBook ? "" : `<button class="btn sm line grow" data-a="message" data-id="${p.id}">Message</button>`}</div>` : ""}
-      <div class="stats"><div><b>${p.shows}</b><span class="tiny muted">${p.roles.includes("artist") ? "Shows played" : "Shows hosted"}</span></div><div><b>${bookedHere}</b><span class="tiny muted">Booked here</span></div><div><b>${followers}</b><span class="tiny muted">Followers</span></div></div>
-      ${p.portfolio.length ? `<section class="section"><div class="section-head"><h3>Listen</h3><span class="tiny faint">${p.portfolio.length} ${p.portfolio.length === 1 ? "track" : "tracks"}</span></div>${p.portfolio.map((w) => player(w, p.id)).join("")}</section>` : ""}
+      ${self ? (p.demo ? "" : `<button class="btn sm line" data-a="editme">${ic("edit", 16)} Edit my profile</button>`) : u ? `<div class="row">${canBook ? `<button class="btn sm pink grow" data-a="message" data-id="${p.id}">Invite to a gig</button>` : ""}<button class="btn sm ${following || canBook ? "line" : "pink"} grow" data-a="follow" data-id="${p.id}" aria-pressed="${following}">${following ? "Following" : "Follow"}</button>${canBook ? "" : `<button class="btn sm line grow" data-a="message" data-id="${p.id}">Message</button>`}</div>` : ""}
+      <div class="stats"><div><b>${p.shows || 0}</b><span class="tiny muted">${p.roles.includes("artist") ? "Shows played" : "Shows hosted"}</span></div><div><b>${bookedHere}</b><span class="tiny muted">Booked here</span></div><div><b>${followers}</b><span class="tiny muted">Followers</span></div></div>
+      ${(p.portfolio || []).length ? `<section class="section"><div class="section-head"><h3>Listen</h3><span class="tiny faint">${p.portfolio.length} ${p.portfolio.length === 1 ? "track" : "tracks"}</span></div>${p.portfolio.map(player).join("")}</section>` : ""}
       ${upcoming.length ? `<section class="section"><div class="section-head"><h3>Catch ${esc(p.name.split(" ")[0])} live</h3></div>${upcoming.map(gigRow).join("")}</section>` : ""}
       ${p.bio ? `<section class="section"><span class="eyebrow">About</span><p class="pre" style="margin:0;font-size:16px">${esc(p.bio)}</p></section>` : ""}
-      ${p.skills.length ? `<div class="row wrap" style="gap:6px">${p.skills.map((s) => `<span class="tag">${esc(s)}</span>`).join("")}</div>` : ""}
+      ${(p.skills || []).length ? `<div class="row wrap" style="gap:6px">${p.skills.map((s) => `<span class="tag">${esc(s)}</span>`).join("")}</div>` : ""}
       <section class="section" style="gap:0"><span class="eyebrow">Posts</span>${posts.length ? posts.map(postView).join("") : `<div class="small faint" style="padding-top:8px">No posts yet.</div>`}</section></div>`;
 }
 function signIn(what) {
-  return `<div class="page"><div class="celebrate"><span class="rays" aria-hidden="true"></span><span class="eyebrow" style="color:#fff">Members</span><span class="display" style="font-size:42px">Sign in to ${what}</span>
-    <span class="row" style="width:100%;margin-top:6px"><button class="btn pink sm grow" data-a="as" data-id="asha">Continue as Asha</button><button class="btn sm grow" style="background:#fff;color:#141118" data-a="as" data-id="olivia">As Olivia</button></span></div></div>`;
+  const canMe = !!store.myId && store.canWrite;
+  return `<div class="page"><div class="celebrate"><span class="rays" aria-hidden="true"></span><span class="eyebrow" style="color:#fff">Members</span><span class="display" style="font-size:42px">Join to ${what}</span>
+    <span class="row" style="width:100%;margin-top:6px">${canMe ? `<button class="btn pink sm grow" data-a="becomeme">Create my profile</button>` : ""}<button class="btn sm grow" style="background:#fff;color:#141118" data-a="as" data-id="asha">Try as Asha</button></span></div></div>`;
+}
+function onboardPrompt() {
+  return `<div class="page"><div class="celebrate"><span class="rays" aria-hidden="true"></span>${eqBars()}<span class="display" style="font-size:42px">Make your EQura profile</span>
+    <span class="small" style="color:#fff">One minute. Then apply to gigs, post your own, and message people.</span>
+    <button class="btn pink sm block" data-a="editme">Create my profile</button></div></div>`;
+}
+const GENRES = ["acoustic", "folk", "indie", "jazz", "soul", "rock", "electronic", "theatre"];
+function profileSheet() {
+  const p = S.users[store.myId] || { name: "", roles: ["artist"], city: "", headline: "", bio: "", genres: [] };
+  return `<span class="eyebrow">${S.users[store.myId] ? "Edit your profile" : "Create your profile"}</span>
+    <div id="pf-err"></div>
+    <div class="field"><label for="pf-name">Your name or stage name</label><input id="pf-name" class="input" maxlength="40" value="${esc(p.name)}" autocomplete="name"></div>
+    <div class="field"><label>I'm here to</label><div class="row">
+      <label class="toggle-card grow" style="grid-template-columns:1fr 24px"><b class="small">Perform</b><input type="checkbox" id="pf-artist" ${p.roles.includes("artist") ? "checked" : ""}></label>
+      <label class="toggle-card grow" style="grid-template-columns:1fr 24px"><b class="small">Host gigs</b><input type="checkbox" id="pf-host" ${p.roles.includes("organizer") ? "checked" : ""}></label></div></div>
+    <div class="row"><div class="field grow"><label for="pf-city">City</label><input id="pf-city" class="input" maxlength="40" value="${esc(p.city)}" placeholder="Bengaluru"></div></div>
+    <div class="field"><label for="pf-headline">One line about you</label><input id="pf-headline" class="input" maxlength="60" value="${esc(p.headline)}" placeholder="Indie singer-songwriter"></div>
+    <div class="field"><label>Your sound</label><div class="chips" style="flex-wrap:wrap;margin:0;padding:0">${GENRES.map((g) => `<label class="chip ${p.genres.includes(g) ? "on" : ""}" style="display:inline-flex;align-items:center;gap:6px"><input type="checkbox" class="pf-genre" value="${g}" ${p.genres.includes(g) ? "checked" : ""} style="display:none">#${g}</label>`).join("")}</div></div>
+    <div class="field"><label for="pf-bio">Bio</label><textarea id="pf-bio" class="textarea" maxlength="400" placeholder="What you play, where you've played, what you're looking for.">${esc(p.bio)}</textarea></div>
+    <div class="row"><button class="btn line grow" data-a="closesheet">Cancel</button><button class="btn pink grow" data-a="saveme">Save profile</button></div>`;
 }
 function applySheet(gigId, done) {
-  const g = gig(gigId), u = me(), host = user(g.owner).name.split(" ")[0];
+  const g = gig(gigId), u = me(), host = first(g.owner);
   if (done) return `<div class="success">${eqBars()}<span class="eyebrow">Application sent</span><div class="display">It's with ${esc(host)}</div><div class="small muted">${esc(g.title)}</div>
     <div class="steps"><div><span class="n">1</span><span><b>${esc(host)} reviews applications</b><br><span class="tiny muted">${esc(closes(g.deadline))}</span></span></div>
-      <div><span class="n">2</span><span>We'll ping you if you're shortlisted or booked</span></div><div><span class="n">3</span><span>Follow it anytime in My gigs</span></div></div>
+      <div><span class="n">2</span><span>You'll get a notification if you're shortlisted or booked</span></div><div><span class="n">3</span><span>Follow it anytime in My gigs</span></div></div>
     <div class="row" style="width:100%"><button class="btn line grow" data-a="closesheet">Done</button><button class="btn pink grow" data-a="trackit">Open My gigs</button></div></div>`;
   return `<div class="col" style="gap:2px"><span class="eyebrow">Applying to</span><b style="font-size:18px">${esc(g.title)}</b><span class="tiny muted">${esc(host)} will see your profile, this note and the tracks you attach.</span></div>
     <div id="apply-err"></div>
     <div class="field"><label for="note">Note to ${esc(host)}</label><textarea id="note" class="textarea" maxlength="1000" placeholder="What would you perform? Mention set length, gear and availability."></textarea>
       <div class="prompt-chips">${["Originals plus one cover", "I bring my own gear", "Free all evening"].map((x) => `<button type="button" data-a="addprompt" data-id="${esc(x)}">+ ${esc(x)}</button>`).join("")}</div></div>
-    ${u.portfolio.length ? `<div class="col" style="gap:8px"><span class="field"><label>Attach your work</label></span>${u.portfolio.map((w) => `<label class="toggle-card"><span class="play">${ic("play", 16, true)}</span>
+    ${(u.portfolio || []).length ? `<div class="col" style="gap:8px"><span class="field"><label>Attach your work</label></span>${u.portfolio.map((w) => `<label class="toggle-card"><span class="play">${ic("play", 16, true)}</span>
       <span class="col" style="gap:0;min-width:0"><b class="small ellipsis">${esc(w.title)}</b><span class="tiny muted">${esc(w.sub)}</span></span><input type="checkbox" class="pick" value="${w.id}" checked aria-label="Attach ${esc(w.title)}"></label>`).join("")}</div>` : ""}
     <button class="btn pink block" data-a="apply" data-id="${gigId}">Send application</button>`;
 }
@@ -965,93 +1073,130 @@ const composeSheet = () => `<span class="eyebrow">New post</span><textarea id="c
 
 /* ======================= Render ======================= */
 const phone = document.getElementById("phone");
+function loadingView() {
+  return `<div class="scroll" style="display:grid;place-items:center;bottom:0"><div class="col" style="align-items:center;gap:14px"><span class="logo" style="font-size:44px">${eqBars()}EQura</span><span class="small muted">Tuning up…</span></div></div>`;
+}
 function render(top = false) {
+  if (store.mode === "starting" || (store.mode === "live" && store.loaded.size < COLS.length)) { phone.innerHTML = loadingView(); renderRail(); return; }
+  if (viewer === "me" && !S.users[store.myId] && ui.tab !== "profile" && !ui.sheet) { /* new user: steer to onboarding */ }
   const r = cur(), u = me();
+  // Keep whatever the viewer is typing when someone else's change re-renders the screen.
+  const keepVals = {}; phone.querySelectorAll("input[id],textarea[id],select[id]").forEach((el) => { if (el.type !== "checkbox") keepVals[el.id] = el.value; else keepVals[el.id] = el.checked; });
+  const focused = document.activeElement?.id, selStart = document.activeElement?.selectionStart;
   const prev = phone.querySelector(".scroll"), keep = prev && !top ? prev.scrollTop : 0;
   const wallPrev = phone.querySelector(".wall"), wallKeep = wallPrev ? wallPrev.scrollLeft : 0;
   const html = screens[r.name](r);
   const cut = html.search(/<div class="(sticky-cta|composer)"/);
   const main = cut >= 0 ? html.slice(0, cut) : html, fixed = cut >= 0 ? html.slice(cut) : "";
-  const msgs = u ? S.convos.filter((c) => c.users.includes(u.id)).reduce((n, c) => n + S.messages.filter((m) => m.convo === c.id && m.from !== u.id && (!c.read[u.id] || m.at > c.read[u.id])).length, 0) : 0;
-  const waiting = u ? S.apps.filter((a) => manages(gig(a.gig)) && a.status === "submitted").length : 0;
-  const tabs = [["gigs", "gigs", "Gigs"], ["scene", "scene", "Scene"], ["mine", "mine", "My gigs", waiting], ["inbox", "inbox", "Inbox", msgs], ["profile", "user", u ? "Profile" : "Sign in"]];
+  const msgs = u ? S.convos.filter((c) => c.users.includes(u.id)).reduce((n, c) => n + unreadIn(c, u), 0) : 0;
+  const waiting = u ? S.apps.filter((a) => { const g = gig(a.gig); return g && manages(g) && a.status === "submitted"; }).length : 0;
+  const tabs = [["gigs", "gigs", "Gigs"], ["scene", "scene", "Scene"], ["mine", "mine", "My gigs", waiting], ["inbox", "inbox", "Inbox", msgs], ["profile", "user", u ? "Profile" : "Join"]];
+  const sheet = ui.sheet ? (ui.sheet.kind === "apply" ? applySheet(ui.sheet.id, ui.sheet.done) : ui.sheet.kind === "profile" ? profileSheet() : composeSheet()) : "";
   phone.innerHTML = `<div class="scroll">${main}</div>${fixed}
     <nav class="nav" aria-label="Main">${tabs.map(([k, i, t, c]) => `<button class="${ui.tab === k ? "on" : ""}" data-a="tab" data-id="${k}" ${ui.tab === k ? 'aria-current="page"' : ""}><span class="pill">${ic(i, 20)}</span>${t}${c ? `<span class="badge">${c > 9 ? "9+" : c}</span>` : ""}</button>`).join("")}</nav>
-    ${ui.sheet ? `<div class="backdrop" data-a="closesheet"></div><div class="sheet" role="dialog" aria-modal="true" aria-label="${ui.sheet.kind === "apply" ? "Apply" : "New post"}"><div class="grabber"></div>${ui.sheet.kind === "apply" ? applySheet(ui.sheet.id, ui.sheet.done) : composeSheet()}</div>` : ""}
+    ${sheet ? `<div class="backdrop" data-a="closesheet"></div><div class="sheet" role="dialog" aria-modal="true">${`<div class="grabber"></div>`}${sheet}</div>` : ""}
     ${ui.toast ? `<div class="toast ${ui.toast.bad ? "bad" : ""}" role="status">${ui.toast.bad ? ic("x", 18) : ic("check", 18)}<span>${esc(ui.toast.text)}</span></div>` : ""}`;
+  for (const [id, v] of Object.entries(keepVals)) { const el = document.getElementById(id); if (el && !el.disabled) { if (el.type === "checkbox") el.checked = v; else if (el.value !== v && id !== "q") el.value = v; } }
+  if (focused) { const el = document.getElementById(focused); if (el) { el.focus(); try { if (selStart != null) el.setSelectionRange(selStart, selStart); } catch {} } }
   const sc = phone.querySelector(".scroll");
   sc.scrollTop = r.name === "thread" ? sc.scrollHeight : keep;
   const w = phone.querySelector(".wall"); if (w && !top) w.scrollLeft = wallKeep;
-  document.getElementById("who").innerHTML = [["asha", "Asha Rao", "Artist"], ["olivia", "Olivia Fernandes", "Hosts gigs, also performs"], ["visitor", "Visitor", "Not signed in"]]
-    .map(([id, n, d]) => `<button type="button" class="${S.viewer === id ? "on" : ""}" data-a="as" data-id="${id}" aria-pressed="${S.viewer === id}">${id === "visitor" ? `<span class="av" style="background:var(--sunk);color:var(--ink-2)">?</span>` : av(id)}<span style="min-width:0"><b>${n}</b><small>${d}</small></span></button>`).join("");
-  save();
+  renderRail();
+}
+function renderRail() {
+  const meProfile = store.myId && S.users[store.myId];
+  const options = [
+    ...(store.myId ? [["me", meProfile ? meProfile.name : "You", meProfile ? "Your real account" : "Create your profile"]] : []),
+    ["asha", "Asha Rao", "Demo artist"], ["olivia", "Olivia Fernandes", "Demo host"], ["rohan", "Rohan Mehta", "Demo host"], ["visitor", "Visitor", "Just browsing"],
+  ];
+  document.getElementById("who").innerHTML = options.map(([id, n, d]) => `<button type="button" class="${viewer === id ? "on" : ""}" data-a="as" data-id="${id}" aria-pressed="${viewer === id}">${id === "visitor" ? `<span class="av" style="background:var(--sunk);color:var(--ink-2)">?</span>` : av(id === "me" ? store.myId : id)}<span style="min-width:0"><b>${esc(n)}</b><small>${d}</small></span></button>`).join("");
+  const status = document.getElementById("live");
+  if (status) status.innerHTML = store.mode === "live"
+    ? `<span class="live-dot"></span> Live · shared with everyone on this link${store.canWrite ? "" : " · view only"}`
+    : store.mode === "offline" ? "On this phone · saved on this device" : store.mode === "revoked" ? "Access changed. Reload to continue." : "Connecting…";
+  const reset = document.getElementById("reset");
+  if (reset) reset.hidden = store.mode === "live" && !store.isOwner;
 }
 
 /* ======================= Events ======================= */
 const val = (id) => (document.getElementById(id)?.value ?? "").trim();
 function act(a, id, el) {
   const u = me();
-  const need = () => { if (!u) { toast("Pick Asha or Olivia to do that.", true); return true; } };
+  const need = () => { if (!u) { toast(store.myId ? "Create your profile first, or try as Asha." : "Pick Asha or Olivia to do that.", true); return true; } };
   try {
     switch (a) {
-      case "as": S.viewer = id; Object.assign(ui, { stack: [], sheet: null, mine: null, reviewIdx: 0, confirm: null, playing: null }); render(true); break;
-      case "tab": ui.tab = id; ui.stack = []; ui.sheet = null; render(true); break;
+      case "as": viewer = id; lsSet("equra-acting-as", id); Object.assign(ui, { stack: [], sheet: null, mine: null, reviewIdx: 0, confirm: null, playing: null });
+        if (id === "me" && !S.users[store.myId]) { ui.tab = "profile"; ui.sheet = { kind: "profile" }; } render(true); break;
+      case "becomeme": viewer = "me"; lsSet("equra-acting-as", "me"); ui.stack = []; if (!S.users[store.myId]) ui.sheet = { kind: "profile" }; render(true); break;
+      case "editme": ui.sheet = { kind: "profile" }; render(); break;
+      case "saveme": {
+        guardWrite();
+        const name = val("pf-name"), roles = [document.getElementById("pf-artist").checked && "artist", document.getElementById("pf-host").checked && "organizer"].filter(Boolean);
+        const err = (t) => { document.getElementById("pf-err").innerHTML = `<div class="banner err">${t}</div>`; };
+        if (!name) { err("Add your name or stage name."); break; }
+        if (!roles.length) { err("Pick at least one: perform or host."); break; }
+        const old = S.users[store.myId] || {};
+        put("people", { ink: INKS[hash(store.myId) % INKS.length], shows: 0, skills: [], portfolio: [], ...old, id: store.myId, demo: false, name, roles, city: val("pf-city"), headline: val("pf-headline"),
+          bio: val("pf-bio"), genres: [...phone.querySelectorAll(".pf-genre:checked")].map((x) => x.value), joined: old.joined || now() });
+        viewer = "me"; lsSet("equra-acting-as", "me"); ui.sheet = null; toast(old.id ? "Profile saved" : "Welcome to EQura!"); break;
+      }
+      case "tab": if (cur().name === "thread") markRead(cur().id); ui.tab = id; ui.stack = []; ui.sheet = null; render(true); break;
       case "go": go(id); break;
       case "back": back(); break;
       case "gig": go("gig", { id }); break;
       case "post": go("post", { id }); break;
       case "profile": if (u && id === u.id) { ui.tab = "profile"; ui.stack = []; render(true); } else go("profile", { id }); break;
       case "review": ui.reviewIdx = 0; go("review", { id }); break;
-      case "thread": go("thread", { id }); break;
+      case "thread": markRead(id); go("thread", { id }); break;
       case "filter": ui.filter = id; render(); break;
       case "clearfilters": ui.filter = "all"; ui.q = ""; render(); break;
       case "mineview": ui.mine = id; render(true); break;
       case "sceneview": ui.scene = id; render(true); break;
       case "ridx": ui.reviewIdx = Number(id); ui.playing = null; render(); break;
       case "play": ui.playing = ui.playing === id ? null : id; render(); break;
-      case "celebrated": S.celebrated.push(id); render(); break;
-      case "share": { const link = `https://equra.app/${id}`; const p = navigator.clipboard?.writeText(link); if (p) p.then(() => toast("Link copied"), () => toast(link)); else toast(link); break; }
-      case "compose": ui.sheet = { kind: "compose" }; render(); setTimeout(() => document.getElementById("compose")?.focus(), 50); break;
-      case "publish": { const body = val("compose"); if (!body) return toast("Write something first.", true);
-        S.posts.push({ id: uid("p"), author: u.id, body, at: now() }); ui.sheet = null; ui.scene = "following"; toast("Posted"); break; }
-      case "like": { if (need()) break; const i = S.likes.findIndex((l) => l[0] === u.id && l[1] === id);
-        if (i >= 0) S.likes.splice(i, 1); else { S.likes.push([u.id, id]); notify(S.posts.find((p) => p.id === id).author, u.id, "post.liked", { post: id }); } render(); break; }
-      case "repost": { if (need()) break; const p = S.posts.find((x) => x.id === id);
+      case "celebrated": { const b = S.bookings.find((x) => x.id === id); if (store.canWrite) put("bookings", { ...b, celebrated: true }); render(); break; }
+      case "share": { const link = `https://equra.app/${id}`; const pr = navigator.clipboard?.writeText(link); if (pr) pr.then(() => toast("Link copied"), () => toast(link)); else toast(link); break; }
+      case "compose": if (need()) break; ui.sheet = { kind: "compose" }; render(); setTimeout(() => document.getElementById("compose")?.focus(), 50); break;
+      case "publish": { guardWrite(); const body = val("compose"); if (!body) return toast("Write something first.", true);
+        put("posts", { id: rid("p"), author: u.id, body, at: now() }); ui.sheet = null; ui.scene = "following"; toast("Posted"); break; }
+      case "like": { if (need()) break; guardWrite(); const ex = S.likes.find((l) => l.user === u.id && l.post === id);
+        if (ex) drop("likes", ex.id); else { put("likes", { id: `${u.id}__${id}`, user: u.id, post: id }); notify(S.posts.find((p) => p.id === id).author, u.id, "post.liked", { post: id }); } render(); break; }
+      case "repost": { if (need()) break; guardWrite(); const p = S.posts.find((x) => x.id === id);
         if (p.author === u.id) throw new Rule("You can't repost your own post.");
         if (S.posts.some((x) => x.author === u.id && x.repostOf === id && !x.body)) throw new Rule("You've already reposted this.");
-        S.posts.push({ id: uid("p"), author: u.id, body: "", repostOf: id, at: now() }); notify(p.author, u.id, "post.reposted", { post: id }); toast("Reposted to your followers"); break; }
-      case "comment": { const body = val("cbody"); if (!body) break; S.comments.push({ id: uid("c"), post: id, user: u.id, body, at: now() });
-        notify(S.posts.find((p) => p.id === id).author, u.id, "post.commented", { post: id }); render(); break; }
-      case "follow": { if (need()) break; const i = S.follows.findIndex((f) => f[0] === u.id && f[1] === id);
-        if (i >= 0) S.follows.splice(i, 1); else { S.follows.push([u.id, id]); notify(id, u.id, "user.followed"); } render(); break; }
-      case "message": { if (need()) break; const c = convoWith(id, el?.dataset.gig);
-        const bk = S.bookings.find((b) => b.user === u.id && b.gig === el?.dataset.gig && !S.celebrated.includes(b.id)); if (bk) S.celebrated.push(bk.id);
+        put("posts", { id: rid("p"), author: u.id, body: "", repostOf: id, at: now() }); notify(p.author, u.id, "post.reposted", { post: id }); toast("Reposted to your followers"); break; }
+      case "comment": { guardWrite(); const body = val("cbody"); if (!body) break; put("comments", { id: rid("c"), post: id, user: u.id, body, at: now() });
+        notify(S.posts.find((p) => p.id === id).author, u.id, "post.commented", { post: id }); document.getElementById("cbody").value = ""; render(); break; }
+      case "follow": { if (need()) break; guardWrite(); const ex = S.follows.find((f) => f.a === u.id && f.b === id);
+        if (ex) drop("follows", ex.id); else { put("follows", { id: `${u.id}__${id}`, a: u.id, b: id }); notify(id, u.id, "user.followed"); } render(); break; }
+      case "message": { if (need()) break; guardWrite(); const c = convoWith(id, el?.dataset.gig);
+        const bk = S.bookings.find((b) => b.user === u.id && b.gig === el?.dataset.gig && !b.celebrated); if (bk) put("bookings", { ...bk, celebrated: true });
         ui.tab = "inbox"; ui.stack = [{ name: "thread", id: c.id }]; render(true); break; }
-      case "send": { const body = val("mbody"); if (!body) break; send(id, body); render(); setTimeout(() => document.getElementById("mbody")?.focus(), 0); break; }
+      case "send": { const body = val("mbody"); if (!body) break; send(id, body); document.getElementById("mbody").value = ""; render(); setTimeout(() => document.getElementById("mbody")?.focus(), 0); break; }
       case "openapply": if (!u) { act("as", "asha"); break; } ui.sheet = { kind: "apply", id }; render(); break;
       case "addprompt": { const t = document.getElementById("note"); t.value = (t.value ? t.value.trimEnd() + "\n" : "") + id; t.focus(); break; }
       case "apply": { const items = [...phone.querySelectorAll(".pick:checked")].map((x) => x.value);
-        try { apply(id, val("note"), items); ui.sheet = { kind: "apply", id, done: true }; render(); }
+        try { applyTo(id, val("note"), items); ui.sheet = { kind: "apply", id, done: true }; render(); }
         catch (e) { if (!(e instanceof Rule)) throw e; document.getElementById("apply-err").innerHTML = `<div class="banner err">${esc(e.message)}</div>`; } break; }
       case "trackit": ui.sheet = null; ui.tab = "mine"; ui.mine = "playing"; ui.stack = []; render(true); break;
       case "closesheet": ui.sheet = null; render(); break;
-      case "decide": { const to = el.dataset.to, ap = S.apps.find((x) => x.id === id), name = user(ap.user).name.split(" ")[0]; move(id, to); ui.playing = null;
+      case "decide": { const to = el.dataset.to, ap = S.apps.find((x) => x.id === id), name = first(ap.user); move(id, to); ui.playing = null;
         toast({ accepted: `${name} is booked and has been notified`, shortlisted: `${name} is on your shortlist`, declined: `Passed on ${name}. They've been notified.` }[to]); break; }
       case "withdraw": move(id, "withdrawn"); toast("Application withdrawn"); break;
       case "askcancel": ui.confirm = id; render(); break;
       case "keep": ui.confirm = null; render(); break;
       case "cancelbooking": ui.confirm = null; cancelBooking(id); toast("Booking cancelled. The host has been told."); break;
-      case "readall": S.notifs.filter((n) => n.to === u.id).forEach((n) => (n.read = true)); render(); break;
-      case "notif": { const n = S.notifs.find((x) => x.id === id); n.read = true;
-        if (["application.submitted", "application.withdrawn"].includes(n.type)) { ui.reviewIdx = 0; go("review", { id: n.gig }); }
+      case "readall": if (store.canWrite) S.notifs.filter((n) => n.to === u.id && !n.read).forEach((n) => put("notifs", { ...n, read: true })); render(); break;
+      case "notif": { const n = S.notifs.find((x) => x.id === id); if (!n.read && store.canWrite) put("notifs", { ...n, read: true });
+        if (["application.submitted", "application.withdrawn"].includes(n.type) && gig(n.gig)) { ui.reviewIdx = 0; go("review", { id: n.gig }); }
         else if (n.type === "application.accepted") { ui.tab = "gigs"; ui.stack = []; render(true); }
-        else if (n.gig) go("gig", { id: n.gig }); else if (n.post) go("post", { id: n.post }); else go("profile", { id: n.actor }); break; }
-      case "savegig": { const d = ui.draft, missing = [!d.title.trim() && "a title", !d.venue.trim() && "a venue", !d.desc.trim() && "a description"].filter(Boolean);
+        else if (n.gig && gig(n.gig)) go("gig", { id: n.gig }); else if (n.post) go("post", { id: n.post }); else go("profile", { id: n.actor }); break; }
+      case "savegig": { guardWrite(); const d = ui.draft, missing = [!d.title.trim() && "a title", !d.venue.trim() && "a venue", !d.desc.trim() && "a description"].filter(Boolean);
         const err = (t) => { document.getElementById("ng-err").innerHTML = `<div class="banner err">${t}</div>`; };
         if (id === "published" && missing.length) { err(`To publish, add ${missing.join(", ")}.`); break; }
         if (id === "published" && d.comp === "paid" && !(Number(d.amount) > 0)) { err("Add the amount for a paid gig so artists know what it pays."); break; }
-        const g = { ...draftGig(d), id: uid("g"), event: null, owner: u.id, title: d.title.trim() || "Untitled gig", venue: d.venue.trim(), area: d.area.trim(), status: id, set: "TBC", desc: d.desc.trim(), provides: [], bring: [] };
-        S.gigs.push(g); ui.draft = null; ui.tab = "mine"; ui.mine = "hosting"; ui.stack = [{ name: "gig", id: g.id }];
+        const g = { ...draftGig(d), id: rid("g"), event: null, owner: u.id, title: d.title.trim() || "Untitled gig", venue: d.venue.trim(), area: d.area.trim(), status: id, set: "TBC", desc: d.desc.trim(), provides: [], bring: [], at: now() };
+        put("gigs", g); ui.draft = null; ui.tab = "mine"; ui.mine = "hosting"; ui.stack = [{ name: "gig", id: g.id }];
         toast(id === "published" ? "It's on the wall. Artists can apply now." : "Saved as a draft"); break; }
     }
   } catch (e) { if (e instanceof Rule) toast(e.message, true); else { console.error(e); toast("Something went wrong", true); } }
@@ -1063,6 +1208,10 @@ document.addEventListener("keydown", (e) => {
   if (e.target.id === "mbody") act("send", phone.querySelector('[data-a="send"]').dataset.id);
   if (e.target.id === "cbody") act("comment", phone.querySelector('[data-a="comment"]').dataset.id);
 });
+document.addEventListener("change", (e) => {
+  if (e.target.classList?.contains("pf-genre")) e.target.closest(".chip").classList.toggle("on", e.target.checked);
+  onDraft(e);
+});
 function onDraft(e) {
   const k = e.target.dataset?.k; if (!k || !ui.draft) return;
   ui.draft[k] = e.target.value;
@@ -1073,14 +1222,18 @@ document.addEventListener("input", (e) => {
   if (e.target.id === "q") { ui.q = e.target.value; const pos = e.target.selectionStart; render(); const q = document.getElementById("q"); q.focus(); q.setSelectionRange(pos, pos); return; }
   onDraft(e);
 });
-document.addEventListener("change", onDraft);
-document.getElementById("reset").addEventListener("click", () => { S = seed(); Object.assign(ui, { tab: "gigs", stack: [], sheet: null, draft: null, mine: null, filter: "all", q: "", playing: null }); render(true); toast("Demo reset"); });
+document.getElementById("reset").addEventListener("click", async () => {
+  if (!window.__confirmReset) { window.__confirmReset = true; toast("Tap Reset again to wipe all activity and restore the demo data."); setTimeout(() => (window.__confirmReset = false), 4000); return; }
+  window.__confirmReset = false; Object.assign(ui, { tab: "gigs", stack: [], sheet: null, draft: null, mine: null, filter: "all", q: "", playing: null });
+  try { await resetData(); toast("Demo data restored"); } catch (e) { writeFailed(e); }
+});
 document.getElementById("theme").addEventListener("click", () => {
   const root = document.documentElement, light = root.dataset.theme ? root.dataset.theme === "light" : matchMedia("(prefers-color-scheme: light)").matches;
   root.dataset.theme = light ? "dark" : "light";
 });
+setInterval(() => { if (store.mode === "live" || store.mode === "offline") queueRender(); }, 60000); // keep "5m ago" and countdowns fresh
 render(true);
+if (window.claude?.use) startLive(); else startOffline();
 </script>
-
 </body>
 </html>

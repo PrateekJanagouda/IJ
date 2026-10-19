@@ -53,4 +53,4 @@ jobs:
           gh release create equra-android-latest EQura.apk \
             --prerelease --target "${{ github.sha }}" \
             --title "EQura for Android (test build)" \
-            --notes "Test build from ${{ github.ref_name }} @ ${{ github.sha }}. Demo mode: works offline with sample data. Install: download EQura.apk on your Android phone and allow installs from your browser when asked."
+            --notes "Build from ${{ github.ref_name }} @ ${{ github.sha }}. Full app on your phone: create your profile, post gigs, apply, book, message. Data is saved on the device; switch personas at the top to play artist and host. Install: download EQura.apk on your Android phone and allow installs from your browser when asked."

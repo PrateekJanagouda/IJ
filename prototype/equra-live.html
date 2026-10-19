@@ -499,6 +499,8 @@ function rowsOf(col) { return MAPS[col] ? Object.values(S[MAPS[col]]) : S[col]; 
 function saveOffline() { lsSet(LOCAL_KEY, JSON.stringify(Object.fromEntries(COLS.map((c) => [c, rowsOf(c)])))); }
 function startOffline() {
   store.mode = "offline";
+  store.myId = lsGet("equra-my-id") || rid("u_");
+  lsSet("equra-my-id", store.myId);
   let data = null;
   try { data = JSON.parse(lsGet(LOCAL_KEY)); } catch {}
   data = data && data.people ? data : seed();
@@ -550,7 +552,7 @@ async function resetData() {
   if (store.mode === "live") {
     for (const col of COLS) for (const r of rowsOf(col)) if (!fresh[col].some((f) => f.id === r.id) && !(col === "people" && !r.demo)) await store.db.collection(col).doc(r.id).delete();
     for (const col of COLS) for (const r of fresh[col]) await store.db.collection(col).doc(r.id).set(r);
-  } else { COLS.forEach((c) => apply(c, fresh[c])); saveOffline(); }
+  } else { const mine = Object.values(S.users).filter((u) => !u.demo); COLS.forEach((c) => apply(c, c === "people" ? [...fresh.people, ...mine] : fresh[c])); saveOffline(); }
 }
 
 /* ======================= Rules (mirror backend services) ======================= */
@@ -1025,7 +1027,7 @@ function profilePage(p, pushed) {
       <section class="section" style="gap:0"><span class="eyebrow">Posts</span>${posts.length ? posts.map(postView).join("") : `<div class="small faint" style="padding-top:8px">No posts yet.</div>`}</section></div>`;
 }
 function signIn(what) {
-  const canMe = store.mode === "live" && store.myId && store.canWrite;
+  const canMe = !!store.myId && store.canWrite;
   return `<div class="page"><div class="celebrate"><span class="rays" aria-hidden="true"></span><span class="eyebrow" style="color:#fff">Members</span><span class="display" style="font-size:42px">Join to ${what}</span>
     <span class="row" style="width:100%;margin-top:6px">${canMe ? `<button class="btn pink sm grow" data-a="becomeme">Create my profile</button>` : ""}<button class="btn sm grow" style="background:#fff;color:#141118" data-a="as" data-id="asha">Try as Asha</button></span></div></div>`;
 }
@@ -1101,14 +1103,14 @@ function render(top = false) {
 function renderRail() {
   const meProfile = store.myId && S.users[store.myId];
   const options = [
-    ...(store.mode === "live" && store.myId ? [["me", meProfile ? meProfile.name : "You", meProfile ? "Your real account" : "Create your profile"]] : []),
+    ...(store.myId ? [["me", meProfile ? meProfile.name : "You", meProfile ? "Your real account" : "Create your profile"]] : []),
     ["asha", "Asha Rao", "Demo artist"], ["olivia", "Olivia Fernandes", "Demo host"], ["rohan", "Rohan Mehta", "Demo host"], ["visitor", "Visitor", "Just browsing"],
   ];
   document.getElementById("who").innerHTML = options.map(([id, n, d]) => `<button type="button" class="${viewer === id ? "on" : ""}" data-a="as" data-id="${id}" aria-pressed="${viewer === id}">${id === "visitor" ? `<span class="av" style="background:var(--sunk);color:var(--ink-2)">?</span>` : av(id === "me" ? store.myId : id)}<span style="min-width:0"><b>${esc(n)}</b><small>${d}</small></span></button>`).join("");
   const status = document.getElementById("live");
   if (status) status.innerHTML = store.mode === "live"
     ? `<span class="live-dot"></span> Live · shared with everyone on this link${store.canWrite ? "" : " · view only"}`
-    : store.mode === "offline" ? "Offline demo · saved on this device" : store.mode === "revoked" ? "Access changed. Reload to continue." : "Connecting…";
+    : store.mode === "offline" ? "On this phone · saved on this device" : store.mode === "revoked" ? "Access changed. Reload to continue." : "Connecting…";
   const reset = document.getElementById("reset");
   if (reset) reset.hidden = store.mode === "live" && !store.isOwner;
 }
