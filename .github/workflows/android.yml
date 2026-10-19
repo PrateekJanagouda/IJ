@@ -1,0 +1,56 @@
+name: Android app
+
+# Builds the EQura Android app (Capacitor) and publishes the APK as a
+# pre-release named "equra-android-latest", so it can be downloaded on a phone.
+on:
+  push:
+    paths:
+      - "mobile/**"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write # needed to publish the APK on the release
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      - name: Copy the web app into the Android project
+        run: npx cap sync android
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+      - name: Build APK (Android SDK is preinstalled on GitHub runners)
+        working-directory: mobile/android
+        run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon --stacktrace
+      - run: cp android/app/build/outputs/apk/debug/app-debug.apk EQura.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EQura-android
+          path: mobile/EQura.apk
+      - name: Publish download link
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete equra-android-latest --yes --cleanup-tag || true
+          gh release create equra-android-latest EQura.apk \
+            --prerelease --target "${{ github.sha }}" \
+            --title "EQura for Android (test build)" \
+            --notes "Test build from ${{ github.ref_name }} @ ${{ github.sha }}. Demo mode: works offline with sample data. Install: download EQura.apk on your Android phone and allow installs from your browser when asked."

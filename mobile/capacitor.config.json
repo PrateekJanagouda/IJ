@@ -1,0 +1,10 @@
+{
+  "appId": "app.equra.demo",
+  "appName": "EQura",
+  "webDir": "www",
+  "backgroundColor": "#0f0d13",
+  "android": {
+    "allowMixedContent": false,
+    "adjustMarginsForEdgeToEdge": "auto"
+  }
+}
