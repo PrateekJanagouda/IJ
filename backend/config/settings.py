@@ -104,6 +104,19 @@ DATABASES = {
     }
 }
 
+# Hosted platforms (Render, Railway, Heroku) hand over one DATABASE_URL instead.
+if env("DATABASE_URL"):
+    from urllib.parse import unquote, urlparse
+
+    _db = urlparse(env("DATABASE_URL"))
+    DATABASES["default"].update(
+        NAME=_db.path.lstrip("/"),
+        USER=unquote(_db.username or ""),
+        PASSWORD=unquote(_db.password or ""),
+        HOST=_db.hostname,
+        PORT=str(_db.port or 5432),
+    )
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "identity.User"
 

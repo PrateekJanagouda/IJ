@@ -3,6 +3,8 @@ import type { NextConfig } from "next";
 const backend = process.env.BACKEND_URL ?? "http://localhost:8000";
 
 const nextConfig: NextConfig = {
+  // Self-contained server bundle for the production container (deploy/Dockerfile).
+  output: "standalone",
   // Django routes end in "/"; don't let Next strip it and redirect.
   skipTrailingSlashRedirect: true,
   // Same-origin proxy: the browser only ever talks to this app, so Django's session and

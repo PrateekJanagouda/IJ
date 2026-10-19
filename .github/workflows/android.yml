@@ -8,6 +8,11 @@ on:
       - "mobile/**"
       - ".github/workflows/android.yml"
   workflow_dispatch:
+    inputs:
+      app_url:
+        description: "Hosted EQura URL (e.g. https://equra.onrender.com). Empty = offline demo build."
+        required: false
+        default: ""
 
 permissions:
   contents: write # needed to publish the APK on the release
@@ -30,6 +35,17 @@ jobs:
           cache: npm
           cache-dependency-path: mobile/package-lock.json
       - run: npm ci
+      - name: Point the app at the hosted server (real accounts and login)
+        env:
+          APP_URL: ${{ inputs.app_url || vars.EQURA_URL }}
+        if: ${{ inputs.app_url != '' || vars.EQURA_URL != '' }}
+        run: |
+          node -e '
+            const fs = require("fs"), f = "capacitor.config.json", c = JSON.parse(fs.readFileSync(f));
+            const url = process.env.APP_URL.replace(/\/$/, "");
+            c.server = { url: url + "/login", allowNavigation: [new URL(url).host] };
+            fs.writeFileSync(f, JSON.stringify(c, null, 2));
+            console.log(c.server);'
       - name: Copy the web app into the Android project
         run: npx cap sync android
       - uses: actions/setup-java@v4
@@ -53,4 +69,4 @@ jobs:
           gh release create equra-android-latest EQura.apk \
             --prerelease --target "${{ github.sha }}" \
             --title "EQura for Android (test build)" \
-            --notes "Build from ${{ github.ref_name }} @ ${{ github.sha }}. Full app on your phone: create your profile, post gigs, apply, book, message. Data is saved on the device; switch personas at the top to play artist and host. Install: download EQura.apk on your Android phone and allow installs from your browser when asked."
+            --notes "${{ (inputs.app_url || vars.EQURA_URL) && format('Connected to {0}. Sign up or log in with a real account.', inputs.app_url || vars.EQURA_URL) || 'Offline demo build: data is saved on the phone.' }} Built from ${{ github.ref_name }} @ ${{ github.sha }}. Install: download EQura.apk on your Android phone and allow installs from your browser when asked."

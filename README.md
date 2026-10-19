@@ -105,3 +105,16 @@ Each module owns its tables and business rules in `services.py`. Views only pars
 | Ops | `health/` `health/ready/` `metrics/funnel/` (admin) |
 
 Every error uses the same envelope: `{"error": {"code", "message", "details", "request_id"}}`.
+
+## Put it online (real accounts, login, the Android app)
+
+The whole app (Next.js in front, Django behind it, plus Postgres) deploys as one free Render service from `render.yaml`:
+
+1. Sign in at [render.com](https://render.com) with GitHub.
+2. **New → Blueprint**, pick this repository and the branch that holds `render.yaml`, then **Apply**.
+3. When the deploy is green, open the URL Render shows (e.g. `https://equra.onrender.com`). Demo logins are
+   `asha@demo.equra` / `olivia@demo.equra`, password `equra-demo-2026`, or create your own account.
+4. Build the phone app against it: **Actions → Android app → Run workflow**, paste the URL into `app_url`.
+   The APK on the `equra-android-latest` release then opens the hosted app with real login.
+
+Free Render services sleep after 15 minutes idle; the first request after that takes about a minute.
