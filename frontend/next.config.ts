@@ -13,6 +13,10 @@ const nextConfig: NextConfig = {
     // `:path*` never includes the trailing slash, so add it back (query strings pass through).
     return [{ source: "/api/:path*", destination: `${backend}/api/:path*/` }];
   },
+  // The artist-first app (public/equra.html) is the front door; the older pages stay reachable.
+  async redirects() {
+    return [{ source: "/", destination: "/equra.html", permanent: false }];
+  },
   async headers() {
     return [
       {

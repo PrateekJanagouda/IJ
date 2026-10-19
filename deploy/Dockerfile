@@ -21,6 +21,7 @@ RUN pip install -r backend/requirements.txt
 COPY backend/ backend/
 COPY --from=web /web/.next/standalone/ web/
 COPY --from=web /web/.next/static/ web/.next/static/
+COPY --from=web /web/public/ web/public/
 COPY deploy/start.sh start.sh
 RUN useradd --create-home --uid 1000 equra && chmod +x start.sh
 USER equra

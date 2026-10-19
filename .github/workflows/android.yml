@@ -43,7 +43,7 @@ jobs:
           node -e '
             const fs = require("fs"), f = "capacitor.config.json", c = JSON.parse(fs.readFileSync(f));
             const url = process.env.APP_URL.replace(/\/$/, "");
-            c.server = { url: url + "/login", allowNavigation: [new URL(url).host] };
+            c.server = { url: url + "/", allowNavigation: [new URL(url).host] };
             fs.writeFileSync(f, JSON.stringify(c, null, 2));
             console.log(c.server);'
       - name: Copy the web app into the Android project
