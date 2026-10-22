@@ -16,6 +16,7 @@ api_v1 = [
     path("", include("apps.messaging.urls")),
     path("", include("apps.notifications.urls")),
     path("", include("apps.trust_safety.urls")),
+    path("", include("apps.media.urls")),
 ]
 
 if settings.EXPOSE_API_DOCS:

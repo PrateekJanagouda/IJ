@@ -5,15 +5,18 @@ report lookup and notification resolves through the same rules.
 """
 
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Exists, OuterRef, Q
+from django.db.models import Count, Exists, OuterRef, Prefetch, Q
 
 from apps.audit import services as audit
 from apps.identity import services as identity
+from apps.media import services as media
 from apps.outbox import services as outbox
 from apps.trust_safety import services as safety
 from shared.errors import Conflict, Forbidden, NotFound, ValidationFailed
 
-from .models import Comment, Follow, Post, PostLike
+from .models import Comment, Follow, Post, PostLike, PostMedia
+
+MAX_POST_MEDIA = 4
 
 # --- Follows ----------------------------------------------------------------
 
@@ -94,6 +97,9 @@ def visible_posts(viewer):
 def annotate_posts(qs, viewer):
     qs = qs.select_related("author", "author__profile", "repost_of", "repost_of__author",
                            "repost_of__author__profile")
+    attachments = PostMedia.objects.select_related("media").defer("media__data")
+    qs = qs.prefetch_related(Prefetch("media_links", queryset=attachments),
+                             Prefetch("repost_of__media_links", queryset=attachments))
     qs = qs.annotate(
         like_count=Count("likes", distinct=True),
         comment_count=Count(
@@ -136,11 +142,18 @@ def posts_by_author(viewer, author_id):
 
 
 @transaction.atomic
-def create_post(actor, *, body, visibility=Post.Visibility.PUBLIC):
+def create_post(actor, *, body, visibility=Post.Visibility.PUBLIC, media_ids=()):
     body = (body or "").strip()
-    if not body:
-        raise ValidationFailed(details={"fields": {"body": ["A post needs text."]}})
-    return Post.objects.create(author=actor, body=body, visibility=visibility)
+    assets = media.owned_assets(actor, media_ids, limit=MAX_POST_MEDIA)
+    if not body and not assets:
+        raise ValidationFailed(
+            details={"fields": {"body": ["Add some text, a photo or a video."]}})
+    post = Post.objects.create(
+        author=actor, body=body, visibility=visibility, has_media=bool(assets))
+    PostMedia.objects.bulk_create(
+        PostMedia(post=post, media=asset, position=i) for i, asset in enumerate(assets)
+    )
+    return post
 
 
 @transaction.atomic
@@ -186,7 +199,7 @@ def update_post(actor, post_id, data):
         raise Conflict("This post was hidden by moderation.", code="moderated")
     if "body" in data:
         body = (data["body"] or "").strip()
-        if not body and not post.repost_of_id:
+        if not body and not post.repost_of_id and not post.has_media:
             raise ValidationFailed(details={"fields": {"body": ["A post needs text."]}})
         post.body = body
     if "visibility" in data:

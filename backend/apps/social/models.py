@@ -50,12 +50,16 @@ class Post(TimeStampedModel):
         max_length=10, choices=Visibility.choices, default=Visibility.PUBLIC
     )
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PUBLISHED)
+    # Denormalised so the "not empty" rule stays a database constraint: a check
+    # constraint can't look into the attachments table.
+    has_media = models.BooleanField(default=False)
 
     class Meta:
         db_table = "posts"
         constraints = [
             models.CheckConstraint(
-                condition=~Q(body="") | Q(repost_of__isnull=False), name="post_has_content"
+                condition=~Q(body="") | Q(repost_of__isnull=False) | Q(has_media=True),
+                name="post_has_content",
             ),
             models.UniqueConstraint(
                 fields=["author", "repost_of"],
@@ -67,6 +71,19 @@ class Post(TimeStampedModel):
             models.Index(fields=["author", "-created_at", "-id"]),
             models.Index(fields=["status", "visibility", "-created_at"]),
         ]
+
+
+class PostMedia(models.Model):
+    """Photos and videos attached to a post, in display order."""
+
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="media_links")
+    media = models.ForeignKey("media.MediaAsset", on_delete=models.PROTECT, related_name="+")
+    position = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        db_table = "post_media"
+        ordering = ["position"]
+        constraints = [models.UniqueConstraint(fields=["post", "media"], name="uniq_post_media")]
 
 
 class Comment(TimeStampedModel):

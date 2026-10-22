@@ -2,8 +2,19 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.identity import services as identity
+from apps.media import services as media
+from shared.serializers import UserSummarySerializer
 
-from .models import ArtistDetails, Genre, OrganizerDetails, PortfolioItem, Profile, Skill, Venue
+from .models import (
+    ArtistDetails,
+    Genre,
+    OrganizerDetails,
+    PortfolioItem,
+    Profile,
+    Skill,
+    Venue,
+    VenueBooking,
+)
 
 
 class GenreSerializer(serializers.ModelSerializer):
@@ -141,20 +152,83 @@ class ProfileUpdateSerializer(serializers.Serializer):
     organizer = OrganizerInputSerializer(required=False)
 
 
+class VenuePhotoSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    kind = serializers.CharField()
+    url = serializers.CharField()
+
+
 class VenueSerializer(serializers.ModelSerializer):
     viewer_is_manager = serializers.SerializerMethodField()
+    photos = serializers.SerializerMethodField()
+    managers = serializers.SerializerMethodField()
+    photo_ids = serializers.ListField(child=serializers.UUIDField(), write_only=True,
+                                      required=False, max_length=8)
 
     class Meta:
         model = Venue
-        fields = ["id", "name", "description", "city", "address_text", "capacity",
-                  "viewer_is_manager", "created_at", "updated_at"]
-        read_only_fields = ["id", "created_at", "updated_at", "viewer_is_manager"]
+        fields = ["id", "name", "headline", "description", "city", "address_text", "capacity",
+                  "starting_price", "currency", "payment_terms", "amenities", "is_listed",
+                  "photos", "photo_ids", "managers", "viewer_is_manager", "created_at",
+                  "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at", "viewer_is_manager", "photos",
+                            "managers"]
 
     def get_viewer_is_manager(self, venue) -> bool:
         from .services import is_venue_manager
 
         request = self.context.get("request")
         return is_venue_manager(request and request.user, venue.id)
+
+    @extend_schema_field(VenuePhotoSerializer(many=True))
+    def get_photos(self, venue):
+        return [{"id": str(p.id), "kind": p.kind, "url": media.url_for(p.id)}
+                for p in venue.photos.all()]
+
+    @extend_schema_field(UserSummarySerializer(many=True))
+    def get_managers(self, venue):
+        return UserSummarySerializer([m.user for m in venue.memberships.all()], many=True).data
+
+
+class BookedVenueSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    name = serializers.CharField()
+    city = serializers.CharField()
+
+
+class VenueBookingSerializer(serializers.ModelSerializer):
+    venue = BookedVenueSerializer(read_only=True)
+    requester = UserSummarySerializer(read_only=True)
+
+    class Meta:
+        model = VenueBooking
+        fields = ["id", "venue", "requester", "date", "status", "message", "expected_headcount",
+                  "decided_at", "created_at"]
+        read_only_fields = fields
+
+
+class VenueBookingInputSerializer(serializers.Serializer):
+    date = serializers.DateField()
+    message = serializers.CharField(max_length=1000, required=False, allow_blank=True, default="")
+    expected_headcount = serializers.IntegerField(min_value=1, max_value=100000, required=False,
+                                                  allow_null=True, default=None)
+
+
+class VenueBlockInputSerializer(serializers.Serializer):
+    date = serializers.DateField()
+    message = serializers.CharField(max_length=1000, required=False, allow_blank=True, default="")
+
+
+class AvailabilityDaySerializer(serializers.Serializer):
+    date = serializers.DateField()
+    status = serializers.ChoiceField(
+        choices=["booked", "blocked", "requested_by_you", "has_requests"])
+
+
+class AvailabilitySerializer(serializers.Serializer):
+    start = serializers.DateField()
+    end = serializers.DateField()
+    days = AvailabilityDaySerializer(many=True)
 
 
 class VenueManagerSerializer(serializers.Serializer):

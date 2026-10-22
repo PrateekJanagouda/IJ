@@ -19,6 +19,7 @@ from apps.messaging import services as messaging
 from apps.opportunities import services as opp
 from apps.outbox.services import process_pending
 from apps.profiles import services as profiles
+from apps.profiles.models import Venue
 from apps.social import services as social
 
 PASSWORD = "equra-demo-2026"
@@ -30,16 +31,65 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         if User.objects.filter(email="asha@demo.equra").exists():
             self.stdout.write("Demo data already present.")
-            return self._print_logins()
-        with transaction.atomic():
-            self._seed()
+        else:
+            with transaction.atomic():
+                self._seed()
+            self.stdout.write(self.style.SUCCESS("Demo data created."))
+        # Seeded separately so databases created before venues existed get them too.
+        if not User.objects.filter(email="venue@demo.equra").exists():
+            with transaction.atomic():
+                self._seed_venues()
+            self.stdout.write(self.style.SUCCESS("Demo venues created."))
         process_pending()
-        self.stdout.write(self.style.SUCCESS("Demo data created."))
         self._print_logins()
+
+    def _seed_venues(self):
+        today = timezone.localdate()
+        karan = self._user(
+            "venue@demo.equra", "Karan Malhotra", ["venue"],
+            {"headline": "Runs The Attic and Courtyard 22", "location_label": "Bengaluru",
+             "bio": "Rooms for live music, comedy and launches. Ten years of Friday nights."},
+        )
+        # Olivia's "The Loft" is just the address record for her own events: keep it out
+        # of the bookable directory, which lists venues with real listing details.
+        Venue.objects.filter(created_by__email="olivia@demo.equra").update(is_listed=False)
+        loft = profiles.create_venue(karan, {
+            "name": "The Attic", "headline": "120-cap listening room with a warm, quiet crowd",
+            "city": "Bengaluru", "address_text": "12th Main, Indiranagar", "capacity": 120,
+            "starting_price": "15000",
+            "payment_terms": "₹15,000 per evening (6pm–11pm), sound engineer included.\n"
+                             "50% advance via UPI to confirm, balance on the day.\n"
+                             "Free cancellation up to 7 days before.",
+            "amenities": "PA with two monitors\nGreen room\nIn-house sound engineer\nBar and kitchen",
+            "description": "A top-floor room with exposed brick and great acoustics. Works best "
+                           "for acoustic sets, singer-songwriters and listening sessions.",
+        })
+        profiles.create_venue(karan, {
+            "name": "Courtyard 22", "headline": "Open-air courtyard for 300, made for big nights",
+            "city": "Bengaluru", "address_text": "Koramangala 5th Block", "capacity": 300,
+            "starting_price": "40000",
+            "payment_terms": "₹40,000 per night, or 20% of ticket sales, whichever is higher.\n"
+                             "₹10,000 refundable deposit by bank transfer.",
+            "amenities": "Stage 20x12 ft\nLine array and DJ booth\nSecurity staff\nParking for 40",
+            "description": "Fairy lights, a big stage and room to dance. Popular for bands, "
+                           "DJ nights and festivals. Sound off at 11pm.",
+        })
+        rohan = User.objects.filter(email="rohan@demo.equra").first()
+        olivia = User.objects.filter(email="olivia@demo.equra").first()
+        if rohan:
+            b = profiles.request_booking(rohan, loft, date=today + timedelta(days=5),
+                                         message="Jazz night, about 90 people.", expected_headcount=90)
+            profiles.decide_booking(karan, b.id, "confirmed")
+        if olivia:
+            profiles.request_booking(olivia, loft, date=today + timedelta(days=9),
+                                     message="Album launch for one of our regulars. Ticketed, ~100.",
+                                     expected_headcount=100)
+        profiles.block_date(karan, loft, date=today + timedelta(days=12), message="Private event")
 
     def _print_logins(self):
         self.stdout.write(f"  artist:    asha@demo.equra / {PASSWORD}")
         self.stdout.write(f"  organizer: olivia@demo.equra / {PASSWORD}")
+        self.stdout.write(f"  venue:     venue@demo.equra / {PASSWORD}")
 
     def _user(self, email, name, roles, profile, artist=None, organizer=None):
         user = identity.register_user(email=email, password=PASSWORD, display_name=name, roles=roles)

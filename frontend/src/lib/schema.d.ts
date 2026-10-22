@@ -703,6 +703,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/media/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Upload one photo or video (multipart field `file`). Attach it by id to a post or venue. */
+        post: operations["media_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/messages/{message_id}/": {
         parameters: {
             query?: never;
@@ -1256,6 +1273,73 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/venue-bookings/{booking_id}/cancel/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description The type of the None singleton. */
+        post: operations["venue_bookings_cancel_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/venue-bookings/{booking_id}/confirm/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description The type of the None singleton. */
+        post: operations["venue_bookings_confirm_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/venue-bookings/{booking_id}/decline/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description The type of the None singleton. */
+        post: operations["venue_bookings_decline_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/venue-bookings/mine/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["venue_bookings_mine_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/venues/": {
         parameters: {
             query?: never;
@@ -1263,6 +1347,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @description Listed venues. `?managed=true` returns the caller's own, listed or not. */
         get: operations["venues_list"];
         put?: never;
         post: operations["venues_create"];
@@ -1286,6 +1371,56 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["venues_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/venues/{venue_id}/availability/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["venues_availability_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/venues/{venue_id}/blocks/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["venues_blocks_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/venues/{venue_id}/bookings/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GET: the venue's bookings and requests (managers only). POST: request a date. */
+        get: operations["venues_bookings_retrieve"];
+        put?: never;
+        /** @description GET: the venue's bookings and requests (managers only). POST: request a date. */
+        post: operations["venues_bookings_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/venues/{venue_id}/managers/": {
@@ -1362,6 +1497,33 @@ export interface components {
             readonly genres: string[];
             readonly skills: string[];
         };
+        Attachment: {
+            /** Format: uuid */
+            id: string;
+            kind: string;
+            content_type: string;
+            url: string;
+        };
+        Availability: {
+            /** Format: date */
+            start: string;
+            /** Format: date */
+            end: string;
+            days: components["schemas"]["AvailabilityDay"][];
+        };
+        AvailabilityDay: {
+            /** Format: date */
+            date: string;
+            status: components["schemas"]["AvailabilityDayStatusEnum"];
+        };
+        /**
+         * @description * `booked` - booked
+         *     * `blocked` - blocked
+         *     * `requested_by_you` - requested_by_you
+         *     * `has_requests` - has_requests
+         * @enum {string}
+         */
+        AvailabilityDayStatusEnum: "booked" | "blocked" | "requested_by_you" | "has_requests";
         Block: {
             readonly user: components["schemas"]["UserSummary"];
             /** Format: date-time */
@@ -1370,6 +1532,12 @@ export interface components {
         BlockRequest: {
             /** Format: date-time */
             created_at: string;
+        };
+        BookedVenue: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            city: string;
         };
         Booking: {
             /** Format: uuid */
@@ -1549,6 +1717,26 @@ export interface components {
             readonly profile_id: string | null;
             /** Format: date-time */
             readonly created_at: string;
+        };
+        Media: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly kind: components["schemas"]["MediaKind"];
+            readonly content_type: string;
+            readonly size: number;
+            readonly url: string;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        /**
+         * @description * `image` - Image
+         *     * `video` - Video
+         * @enum {string}
+         */
+        MediaKind: "image" | "video";
+        MediaUploadRequest: {
+            /** Format: binary */
+            file: string;
         };
         Message: {
             /** Format: uuid */
@@ -1986,10 +2174,18 @@ export interface components {
         };
         PatchedVenueRequest: {
             name?: string;
+            headline?: string;
             description?: string;
             city?: string;
             address_text?: string;
             capacity?: number | null;
+            /** Format: decimal */
+            starting_price?: string | null;
+            currency?: string;
+            payment_terms?: string;
+            amenities?: string;
+            is_listed?: boolean;
+            photo_ids?: string[];
         };
         PortfolioItem: {
             /** Format: uuid */
@@ -2016,6 +2212,7 @@ export interface components {
             readonly id: string;
             readonly author: components["schemas"]["UserSummary"];
             readonly body: string;
+            readonly media: components["schemas"]["Attachment"][];
             readonly visibility: components["schemas"]["PostVisibilityEnum"];
             readonly repost_of: components["schemas"]["RepostRef"] | null;
             /** @default 0 */
@@ -2123,6 +2320,7 @@ export interface components {
             body?: string;
             /** Format: date-time */
             created_at?: string;
+            media?: components["schemas"]["Attachment"][];
             unavailable?: boolean;
         };
         Role: {
@@ -2134,9 +2332,10 @@ export interface components {
         /**
          * @description * `artist` - artist
          *     * `organizer` - organizer
+         *     * `venue` - venue
          * @enum {string}
          */
-        SelfServiceRole: "artist" | "organizer";
+        SelfServiceRole: "artist" | "organizer" | "venue";
         Skill: {
             slug: string;
             name: string;
@@ -2185,16 +2384,63 @@ export interface components {
             /** Format: uuid */
             readonly id: string;
             name: string;
+            headline?: string;
             description?: string;
             city?: string;
             address_text?: string;
             capacity?: number | null;
+            /** Format: decimal */
+            starting_price?: string | null;
+            currency?: string;
+            payment_terms?: string;
+            amenities?: string;
+            is_listed?: boolean;
+            readonly photos: components["schemas"]["VenuePhoto"][];
+            readonly managers: components["schemas"]["UserSummary"][];
             readonly viewer_is_manager: boolean;
             /** Format: date-time */
             readonly created_at: string;
             /** Format: date-time */
             readonly updated_at: string;
         };
+        VenueBlockInputRequest: {
+            /** Format: date */
+            date: string;
+            /** @default  */
+            message: string;
+        };
+        VenueBooking: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly venue: components["schemas"]["BookedVenue"];
+            readonly requester: components["schemas"]["UserSummary"];
+            /** Format: date */
+            readonly date: string;
+            /** @default requested */
+            readonly status: components["schemas"]["VenueBookingStatus"];
+            readonly message: string;
+            readonly expected_headcount: number | null;
+            /** Format: date-time */
+            readonly decided_at: string | null;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        VenueBookingInputRequest: {
+            /** Format: date */
+            date: string;
+            /** @default  */
+            message: string;
+            expected_headcount?: number | null;
+        };
+        /**
+         * @description * `requested` - Requested
+         *     * `confirmed` - Confirmed
+         *     * `declined` - Declined
+         *     * `cancelled` - Cancelled
+         *     * `blocked` - Blocked
+         * @enum {string}
+         */
+        VenueBookingStatus: "requested" | "confirmed" | "declined" | "cancelled" | "blocked";
         VenueManager: {
             /** Format: uuid */
             user_id: string;
@@ -2202,6 +2448,12 @@ export interface components {
         VenueManagerRequest: {
             /** Format: uuid */
             user_id: string;
+        };
+        VenuePhoto: {
+            /** Format: uuid */
+            id: string;
+            kind: string;
+            url: string;
         };
         VenueRef: {
             /** Format: uuid */
@@ -2217,10 +2469,18 @@ export interface components {
         };
         VenueRequest: {
             name: string;
+            headline?: string;
             description?: string;
             city?: string;
             address_text?: string;
             capacity?: number | null;
+            /** Format: decimal */
+            starting_price?: string | null;
+            currency?: string;
+            payment_terms?: string;
+            amenities?: string;
+            is_listed?: boolean;
+            photo_ids?: string[];
         };
         /**
          * @description * `unverified` - Unverified
@@ -3300,6 +3560,29 @@ export interface operations {
             };
         };
     };
+    media_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["MediaUploadRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Media"];
+                };
+            };
+        };
+    };
     messages_destroy: {
         parameters: {
             query?: never;
@@ -4311,6 +4594,88 @@ export interface operations {
             };
         };
     };
+    venue_bookings_cancel_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                booking_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VenueBooking"];
+                };
+            };
+        };
+    };
+    venue_bookings_confirm_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                booking_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VenueBooking"];
+                };
+            };
+        };
+    };
+    venue_bookings_decline_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                booking_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VenueBooking"];
+                };
+            };
+        };
+    };
+    venue_bookings_mine_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VenueBooking"];
+                };
+            };
+        };
+    };
     venues_list: {
         parameters: {
             query?: {
@@ -4400,6 +4765,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Venue"];
+                };
+            };
+        };
+    };
+    venues_availability_retrieve: {
+        parameters: {
+            query?: {
+                /** @description Window length, 1-92 (default 42) */
+                days?: number;
+                /** @description First day (default today) */
+                start?: string;
+            };
+            header?: never;
+            path: {
+                venue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Availability"];
+                };
+            };
+        };
+    };
+    venues_blocks_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                venue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VenueBlockInputRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VenueBooking"];
+                };
+            };
+        };
+    };
+    venues_bookings_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                venue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VenueBooking"];
+                };
+            };
+        };
+    };
+    venues_bookings_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                venue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VenueBookingInputRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VenueBooking"];
                 };
             };
         };

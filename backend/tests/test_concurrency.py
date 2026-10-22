@@ -3,9 +3,11 @@ so they exercise PostgreSQL row locks and unique constraints rather than test-tr
 illusions."""
 
 import threading
+from datetime import timedelta
 
 import pytest
 from django.db import connection
+from django.utils import timezone
 
 from apps.identity.models import Role
 from apps.messaging.models import Conversation
@@ -87,3 +89,27 @@ def test_concurrent_conversation_starts_converge_on_one_conversation():
     assert all(r[0] == "ok" for r in results), results
     assert len({r[1] for r in results}) == 1
     assert Conversation.objects.count() == 1
+
+
+def test_concurrent_venue_confirmations_never_double_book():
+    from apps.profiles import services as profile_services
+    from apps.profiles.models import Venue, VenueBooking, VenueMembership
+
+    owner = make_user("venue-owner@example.com", Role.VENUE)
+    venue = Venue.objects.create(name="Loft", created_by=owner)
+    VenueMembership.objects.create(venue=venue, user=owner)
+    date = timezone.localdate() + timedelta(days=7)
+    requests = [
+        VenueBooking.objects.create(venue=venue, date=date,
+                                    requester=make_user(f"o{i}@example.com", Role.ORGANIZER))
+        for i in range(5)
+    ]
+
+    results = race(
+        lambda booking_id: profile_services.decide_booking(owner, booking_id, "confirmed"),
+        [(b.id,) for b in requests],
+    )
+
+    assert len([r for r in results if r[0] == "ok"]) == 1
+    assert all(isinstance(r[1], Conflict) for r in results if r[0] == "err")
+    assert VenueBooking.objects.filter(venue=venue, date=date, status="confirmed").count() == 1

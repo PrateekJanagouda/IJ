@@ -1,13 +1,18 @@
 """Profiles domain: profile visibility, editing, portfolio, venues."""
 
-from django.db import transaction
+from datetime import timedelta
+
+from django.db import IntegrityError, transaction
 from django.db.models import Q
+from django.utils import timezone
 
 from apps.audit import services as audit
 from apps.identity import services as identity
 from apps.identity.models import Role
+from apps.media import services as media
+from apps.outbox import services as outbox
 from apps.trust_safety import services as safety
-from shared.errors import Forbidden, NotFound, ValidationFailed
+from shared.errors import Conflict, Forbidden, NotFound, ValidationFailed
 
 from .models import (
     ArtistDetails,
@@ -17,6 +22,7 @@ from .models import (
     Profile,
     Skill,
     Venue,
+    VenueBooking,
     VenueMembership,
     Visibility,
 )
@@ -154,12 +160,28 @@ def get_venue(venue_id):
     return venue
 
 
+MAX_VENUE_PHOTOS = 8
+BOOKING_HORIZON_DAYS = 365
+
+
+def listed_venues():
+    return (Venue.objects.filter(is_listed=True)
+            .prefetch_related("photos", "memberships__user__profile"))
+
+
+def _set_photos(actor, venue, photo_ids):
+    if photo_ids is not None:
+        venue.photos.set(media.owned_assets(actor, photo_ids, limit=MAX_VENUE_PHOTOS))
+
+
 @transaction.atomic
 def create_venue(actor, data):
-    if not identity.has_role(actor, Role.ORGANIZER):
-        raise Forbidden("Only organizers can create venues.", code="role_required")
+    if not (identity.has_role(actor, Role.VENUE) or identity.has_role(actor, Role.ORGANIZER)):
+        raise Forbidden("Add the venue role to list a venue.", code="role_required")
+    photo_ids = data.pop("photo_ids", None)
     venue = Venue.objects.create(created_by=actor, **data)
     VenueMembership.objects.create(venue=venue, user=actor)
+    _set_photos(actor, venue, photo_ids)
     audit.record(actor=actor, action="venue.created", resource=venue)
     return venue
 
@@ -168,9 +190,11 @@ def create_venue(actor, data):
 def update_venue(actor, venue, data):
     if not is_venue_manager(actor, venue.id):
         raise Forbidden()
+    photo_ids = data.pop("photo_ids", None)
     for field, value in data.items():
         setattr(venue, field, value)
     venue.save()
+    _set_photos(actor, venue, photo_ids)
     return venue
 
 
@@ -185,3 +209,178 @@ def add_venue_manager(actor, venue, user):
             metadata={"user_id": str(user.id)},
         )
     return created
+
+
+# --- Venue bookings ---------------------------------------------------------
+
+
+def _manager_ids(venue):
+    return [str(i) for i in venue.memberships.values_list("user_id", flat=True)]
+
+
+def _check_bookable_date(date):
+    today = timezone.localdate()
+    if date < today:
+        raise ValidationFailed("Pick a date from today onwards.",
+                               details={"fields": {"date": ["That date has passed."]}})
+    if date > today + timedelta(days=BOOKING_HORIZON_DAYS):
+        raise ValidationFailed("Bookings open up to a year ahead.",
+                               details={"fields": {"date": ["Too far ahead."]}})
+
+
+def _date_taken(venue, date, exclude_id=None):
+    qs = VenueBooking.objects.filter(venue=venue, date=date, status__in=VenueBooking.TAKEN)
+    if exclude_id:
+        qs = qs.exclude(id=exclude_id)
+    return qs.exists()
+
+
+def _event(booking, event, **extra):
+    outbox.publish(f"venue_booking.{event}", {
+        "booking_id": str(booking.id), "venue_id": str(booking.venue_id),
+        "venue_name": booking.venue.name, "date": booking.date.isoformat(),
+        "requester_id": str(booking.requester_id), "manager_ids": _manager_ids(booking.venue),
+        **extra,
+    })
+
+
+def availability(viewer, venue, start, days):
+    """Dates in [start, start+days) that are not simply free. The public sees taken dates;
+    a requester also sees their own open requests; managers see where requests wait."""
+    end = start + timedelta(days=days - 1)
+    manager = is_venue_manager(viewer, venue.id)
+    viewer_id = viewer.id if viewer is not None and viewer.is_authenticated else None
+    marks = {}
+    rows = venue.bookings.filter(date__range=(start, end)).exclude(
+        status__in=[VenueBooking.Status.DECLINED, VenueBooking.Status.CANCELLED])
+    for b in rows:
+        if b.status in VenueBooking.TAKEN:
+            marks[b.date] = "booked" if b.status == VenueBooking.Status.CONFIRMED else "blocked"
+        elif b.requester_id == viewer_id:
+            marks.setdefault(b.date, "requested_by_you")
+        elif manager:
+            marks.setdefault(b.date, "has_requests")
+    return {"start": start, "end": end,
+            "days": [{"date": d, "status": marks[d]} for d in sorted(marks)]}
+
+
+@transaction.atomic
+def request_booking(actor, venue, *, date, message="", expected_headcount=None):
+    if not venue.is_listed:
+        raise NotFound("Venue not found.")
+    if is_venue_manager(actor, venue.id):
+        raise Conflict("You manage this venue. Block the date instead.", code="own_venue")
+    _check_bookable_date(date)
+    if _date_taken(venue, date):
+        raise Conflict("That date is already booked. Pick another day.", code="date_unavailable")
+    try:
+        with transaction.atomic():
+            booking = VenueBooking.objects.create(
+                venue=venue, requester=actor, date=date, message=message.strip(),
+                expected_headcount=expected_headcount,
+            )
+    except IntegrityError as exc:
+        raise Conflict("You already asked for this date.", code="already_requested") from exc
+    audit.record(actor=actor, action="venue_booking.requested", resource=booking)
+    _event(booking, "requested")
+    return booking
+
+
+def _lock_venue(venue_id):
+    # Lock order is always venue, then bookings. Locking the booking first deadlocks:
+    # two confirms each hold their own request and wait on the other's while declining
+    # rivals. One lock per venue makes every booking change for it take turns.
+    Venue.objects.select_for_update().filter(id=venue_id).first()
+
+
+def _locked_booking(booking_id):
+    venue_id = VenueBooking.objects.filter(id=booking_id).values_list("venue_id", flat=True).first()
+    if venue_id is None:
+        raise NotFound("Booking not found.")
+    _lock_venue(venue_id)
+    return VenueBooking.objects.select_for_update().select_related("venue").get(id=booking_id)
+
+
+def _take_date(actor, booking, status):
+    """Confirm or block `booking`'s date. The caller holds the venue lock; the unique
+    constraint backs it up. Competing open requests for that day are declined."""
+    if _date_taken(booking.venue, booking.date, exclude_id=booking.id):
+        raise Conflict("That date is already booked.", code="date_unavailable")
+    booking.status, booking.decided_by, booking.decided_at = status, actor, timezone.now()
+    try:
+        with transaction.atomic():
+            booking.save()
+    except IntegrityError as exc:
+        raise Conflict("That date is already booked.", code="date_unavailable") from exc
+    losers = VenueBooking.objects.select_for_update().filter(
+        venue_id=booking.venue_id, date=booking.date, status=VenueBooking.Status.REQUESTED,
+    ).exclude(id=booking.id).select_related("venue")
+    for other in losers:
+        other.status, other.decided_by, other.decided_at = (
+            VenueBooking.Status.DECLINED, actor, timezone.now())
+        other.save()
+        _event(other, "status_changed", to_status="declined", actor_id=str(actor.id))
+
+
+@transaction.atomic
+def decide_booking(actor, booking_id, to):
+    booking = _locked_booking(booking_id)
+    if not is_venue_manager(actor, booking.venue_id):
+        raise NotFound("Booking not found.")
+    if booking.status != VenueBooking.Status.REQUESTED:
+        raise Conflict(f"This request is already {booking.status}.", code="invalid_transition")
+    if to == VenueBooking.Status.CONFIRMED:
+        _check_bookable_date(booking.date)
+        _take_date(actor, booking, VenueBooking.Status.CONFIRMED)
+    else:
+        booking.status, booking.decided_by, booking.decided_at = to, actor, timezone.now()
+        booking.save()
+    audit.record(actor=actor, action=f"venue_booking.{to}", resource=booking)
+    _event(booking, "status_changed", to_status=to, actor_id=str(actor.id))
+    return booking
+
+
+@transaction.atomic
+def cancel_booking(actor, booking_id):
+    booking = _locked_booking(booking_id)
+    manager = is_venue_manager(actor, booking.venue_id)
+    if not manager and booking.requester_id != actor.id:
+        raise NotFound("Booking not found.")
+    cancellable = {VenueBooking.Status.REQUESTED, VenueBooking.Status.CONFIRMED}
+    if manager:
+        cancellable.add(VenueBooking.Status.BLOCKED)
+    if booking.status not in cancellable:
+        raise Conflict(f"A {booking.status} booking can't be cancelled.", code="invalid_transition")
+    was_blocked = booking.status == VenueBooking.Status.BLOCKED
+    booking.status, booking.decided_by, booking.decided_at = (
+        VenueBooking.Status.CANCELLED, actor, timezone.now())
+    booking.save()
+    audit.record(actor=actor, action="venue_booking.cancelled", resource=booking)
+    if not was_blocked:
+        _event(booking, "status_changed", to_status="cancelled", actor_id=str(actor.id))
+    return booking
+
+
+@transaction.atomic
+def block_date(actor, venue, *, date, message=""):
+    if not is_venue_manager(actor, venue.id):
+        raise Forbidden()
+    _check_bookable_date(date)
+    _lock_venue(venue.id)
+    booking = VenueBooking(venue=venue, requester=actor, date=date, message=message.strip())
+    _take_date(actor, booking, VenueBooking.Status.BLOCKED)
+    audit.record(actor=actor, action="venue_booking.blocked", resource=booking)
+    return booking
+
+
+def venue_bookings_for_manager(actor, venue):
+    if not is_venue_manager(actor, venue.id):
+        raise Forbidden()
+    since = timezone.localdate() - timedelta(days=30)
+    return (venue.bookings.filter(date__gte=since).select_related("venue", "requester__profile")
+            .order_by("date", "created_at"))
+
+
+def my_venue_bookings(actor):
+    return (VenueBooking.objects.filter(requester=actor).exclude(status=VenueBooking.Status.BLOCKED)
+            .select_related("venue", "requester__profile").order_by("-date"))

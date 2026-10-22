@@ -66,11 +66,12 @@ class User(AbstractBaseUser, PermissionsMixin):
 class Role(models.TextChoices):
     ARTIST = "artist"
     ORGANIZER = "organizer"
+    VENUE = "venue"  # runs or manages a venue that organizers can book
     MODERATOR = "moderator"
     ADMINISTRATOR = "administrator"
 
 
-SELF_SERVICE_ROLES = {Role.ARTIST, Role.ORGANIZER}
+SELF_SERVICE_ROLES = {Role.ARTIST, Role.ORGANIZER, Role.VENUE}
 
 
 class RoleAssignment(models.Model):

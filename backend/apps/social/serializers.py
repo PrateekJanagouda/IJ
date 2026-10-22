@@ -2,18 +2,39 @@ from django.conf import settings
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from apps.media import services as media
 from shared.serializers import UserSummarySerializer
 
 from .models import Comment, Post
 
 
+class AttachmentSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    kind = serializers.CharField()
+    content_type = serializers.CharField()
+    url = serializers.CharField()
+
+
+def attachments(post):
+    return [
+        {"id": str(link.media_id), "kind": link.media.kind, "content_type": link.media.content_type,
+         "url": media.url_for(link.media_id)}
+        for link in post.media_links.all()
+    ]
+
+
 class EmbeddedPostSerializer(serializers.ModelSerializer):
     author = UserSummarySerializer(read_only=True)
+    media = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
-        fields = ["id", "author", "body", "created_at"]
+        fields = ["id", "author", "body", "media", "created_at"]
         read_only_fields = fields
+
+    @extend_schema_field(AttachmentSerializer(many=True))
+    def get_media(self, post):
+        return attachments(post)
 
 
 class RepostRefSerializer(serializers.Serializer):
@@ -23,6 +44,7 @@ class RepostRefSerializer(serializers.Serializer):
     author = UserSummarySerializer(required=False)
     body = serializers.CharField(required=False)
     created_at = serializers.DateTimeField(required=False)
+    media = AttachmentSerializer(many=True, required=False)
     unavailable = serializers.BooleanField(required=False)
 
 
@@ -33,12 +55,13 @@ class PostSerializer(serializers.ModelSerializer):
     comment_count = serializers.IntegerField(read_only=True, default=0)
     viewer_has_liked = serializers.BooleanField(read_only=True, default=False)
     share_url = serializers.SerializerMethodField()
+    media = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
         fields = [
-            "id", "author", "body", "visibility", "repost_of", "like_count", "comment_count",
-            "viewer_has_liked", "share_url", "created_at", "updated_at",
+            "id", "author", "body", "media", "visibility", "repost_of", "like_count",
+            "comment_count", "viewer_has_liked", "share_url", "created_at", "updated_at",
         ]
         read_only_fields = fields
 
@@ -52,12 +75,18 @@ class PostSerializer(serializers.ModelSerializer):
             return {"id": str(original.id), "unavailable": True}
         return EmbeddedPostSerializer(original).data
 
+    @extend_schema_field(AttachmentSerializer(many=True))
+    def get_media(self, post):
+        return attachments(post)
+
     def get_share_url(self, post) -> str:
         return f"{settings.FRONTEND_BASE_URL}/posts/{post.id}"
 
 
 class PostInputSerializer(serializers.Serializer):
-    body = serializers.CharField(max_length=5000, allow_blank=True)
+    body = serializers.CharField(max_length=5000, allow_blank=True, required=False, default="")
+    media_ids = serializers.ListField(child=serializers.UUIDField(), required=False, default=list,
+                                      max_length=4)
     visibility = serializers.ChoiceField(choices=Post.Visibility.choices, required=False)
 
 

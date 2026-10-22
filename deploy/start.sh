@@ -9,8 +9,9 @@ if [ "${SEED_DEMO:-true}" = "true" ]; then
   python manage.py seed_demo
 fi
 
+# --timeout covers slow video uploads relayed by Next (see next.config.ts proxyTimeout).
 gunicorn config.wsgi:application --bind 127.0.0.1:8000 --workers "${WEB_CONCURRENCY:-2}" \
-  --access-logfile - &
+  --timeout 180 --access-logfile - &
 DJANGO_PID=$!
 
 cd "$APP_DIR/web"

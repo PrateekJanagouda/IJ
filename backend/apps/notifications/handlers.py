@@ -138,6 +138,35 @@ def on_user_followed(p):
     )
 
 
+def _venue_payload(p):
+    return {"venue_id": p["venue_id"], "venue_name": p["venue_name"], "date": p["date"]}
+
+
+def on_venue_booking_requested(p):
+    for manager_id in p["manager_ids"]:
+        notify(
+            recipient_id=manager_id, actor_id=p["requester_id"],
+            notification_type="venue_booking.requested",
+            resource_type="venue_booking", resource_id=p["booking_id"],
+            payload=_venue_payload(p),
+            dedup_key=f"venue_booking.requested:{p['booking_id']}:{manager_id}",
+        )
+
+
+def on_venue_booking_status_changed(p):
+    to, actor = p["to_status"], p["actor_id"]
+    # Decisions go to the requester; a requester's cancellation goes to the managers.
+    recipients = p["manager_ids"] if actor == p["requester_id"] else [p["requester_id"]]
+    for recipient in recipients:
+        notify(
+            recipient_id=recipient, actor_id=actor,
+            notification_type=f"venue_booking.{to}",
+            resource_type="venue_booking", resource_id=p["booking_id"],
+            payload=_venue_payload(p),
+            dedup_key=f"venue_booking.{to}:{p['booking_id']}:{recipient}",
+        )
+
+
 def register():
     outbox.subscribe("application.submitted", on_application_submitted)
     outbox.subscribe("application.status_changed", on_application_status_changed)
@@ -150,3 +179,5 @@ def register():
     outbox.subscribe("post.commented", on_post_commented)
     outbox.subscribe("post.reposted", on_post_reposted)
     outbox.subscribe("user.followed", on_user_followed)
+    outbox.subscribe("venue_booking.requested", on_venue_booking_requested)
+    outbox.subscribe("venue_booking.status_changed", on_venue_booking_status_changed)

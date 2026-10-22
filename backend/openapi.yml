@@ -1041,6 +1041,28 @@ paths:
               schema:
                 $ref: '#/components/schemas/Status'
           description: ''
+  /api/v1/media/:
+    post:
+      operationId: media_create
+      description: Upload one photo or video (multipart field `file`). Attach it by
+        id to a post or venue.
+      tags:
+      - media
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MediaUploadRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Media'
+          description: ''
   /api/v1/messages/{message_id}/:
     delete:
       operationId: messages_destroy
@@ -2043,9 +2065,91 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedFollowList'
           description: ''
+  /api/v1/venue-bookings/{booking_id}/cancel/:
+    post:
+      operationId: venue_bookings_cancel_create
+      description: The type of the None singleton.
+      parameters:
+      - in: path
+        name: booking_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - venue-bookings
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VenueBooking'
+          description: ''
+  /api/v1/venue-bookings/{booking_id}/confirm/:
+    post:
+      operationId: venue_bookings_confirm_create
+      description: The type of the None singleton.
+      parameters:
+      - in: path
+        name: booking_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - venue-bookings
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VenueBooking'
+          description: ''
+  /api/v1/venue-bookings/{booking_id}/decline/:
+    post:
+      operationId: venue_bookings_decline_create
+      description: The type of the None singleton.
+      parameters:
+      - in: path
+        name: booking_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - venue-bookings
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VenueBooking'
+          description: ''
+  /api/v1/venue-bookings/mine/:
+    get:
+      operationId: venue_bookings_mine_retrieve
+      tags:
+      - venue-bookings
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VenueBooking'
+          description: ''
   /api/v1/venues/:
     get:
       operationId: venues_list
+      description: Listed venues. `?managed=true` returns the caller's own, listed
+        or not.
       parameters:
       - name: cursor
         required: false
@@ -2136,6 +2240,117 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Venue'
+          description: ''
+  /api/v1/venues/{venue_id}/availability/:
+    get:
+      operationId: venues_availability_retrieve
+      parameters:
+      - in: query
+        name: days
+        schema:
+          type: integer
+        description: Window length, 1-92 (default 42)
+      - in: query
+        name: start
+        schema:
+          type: string
+          format: date
+        description: First day (default today)
+      - in: path
+        name: venue_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - venues
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Availability'
+          description: ''
+  /api/v1/venues/{venue_id}/blocks/:
+    post:
+      operationId: venues_blocks_create
+      parameters:
+      - in: path
+        name: venue_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - venues
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VenueBlockInputRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VenueBooking'
+          description: ''
+  /api/v1/venues/{venue_id}/bookings/:
+    get:
+      operationId: venues_bookings_retrieve
+      description: 'GET: the venue''s bookings and requests (managers only). POST:
+        request a date.'
+      parameters:
+      - in: path
+        name: venue_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - venues
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VenueBooking'
+          description: ''
+    post:
+      operationId: venues_bookings_create
+      description: 'GET: the venue''s bookings and requests (managers only). POST:
+        request a date.'
+      parameters:
+      - in: path
+        name: venue_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - venues
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VenueBookingInputRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VenueBooking'
           description: ''
   /api/v1/venues/{venue_id}/managers/:
     post:
@@ -2300,6 +2515,63 @@ components:
       - experience_summary
       - genres
       - skills
+    Attachment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        content_type:
+          type: string
+        url:
+          type: string
+      required:
+      - content_type
+      - id
+      - kind
+      - url
+    Availability:
+      type: object
+      properties:
+        start:
+          type: string
+          format: date
+        end:
+          type: string
+          format: date
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/AvailabilityDay'
+      required:
+      - days
+      - end
+      - start
+    AvailabilityDay:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        status:
+          $ref: '#/components/schemas/AvailabilityDayStatusEnum'
+      required:
+      - date
+      - status
+    AvailabilityDayStatusEnum:
+      enum:
+      - booked
+      - blocked
+      - requested_by_you
+      - has_requests
+      type: string
+      description: |-
+        * `booked` - booked
+        * `blocked` - blocked
+        * `requested_by_you` - requested_by_you
+        * `has_requests` - has_requests
     Block:
       type: object
       properties:
@@ -2321,6 +2593,20 @@ components:
           format: date-time
       required:
       - created_at
+    BookedVenue:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        city:
+          type: string
+      required:
+      - city
+      - id
+      - name
     Booking:
       type: object
       properties:
@@ -2770,6 +3056,53 @@ components:
       - id
       - profile_id
       - roles
+    Media:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        kind:
+          allOf:
+          - $ref: '#/components/schemas/MediaKind'
+          readOnly: true
+        content_type:
+          type: string
+          readOnly: true
+        size:
+          type: integer
+          readOnly: true
+        url:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - content_type
+      - created_at
+      - id
+      - kind
+      - size
+      - url
+    MediaKind:
+      enum:
+      - image
+      - video
+      type: string
+      description: |-
+        * `image` - Image
+        * `video` - Video
+    MediaUploadRequest:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+      required:
+      - file
     Message:
       type: object
       properties:
@@ -3777,6 +4110,9 @@ components:
           type: string
           minLength: 1
           maxLength: 120
+        headline:
+          type: string
+          maxLength: 160
         description:
           type: string
           maxLength: 4000
@@ -3791,6 +4127,30 @@ components:
           maximum: 2147483647
           minimum: 0
           nullable: true
+        starting_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+        currency:
+          type: string
+          minLength: 1
+          maxLength: 3
+        payment_terms:
+          type: string
+          maxLength: 1000
+        amenities:
+          type: string
+          maxLength: 1000
+        is_listed:
+          type: boolean
+        photo_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          writeOnly: true
+          maxItems: 8
     PortfolioItem:
       type: object
       properties:
@@ -3861,6 +4221,11 @@ components:
         body:
           type: string
           readOnly: true
+        media:
+          type: array
+          items:
+            $ref: '#/components/schemas/Attachment'
+          readOnly: true
         visibility:
           allOf:
           - $ref: '#/components/schemas/PostVisibilityEnum'
@@ -3900,6 +4265,7 @@ components:
       - created_at
       - id
       - like_count
+      - media
       - repost_of
       - share_url
       - updated_at
@@ -4139,6 +4505,10 @@ components:
         created_at:
           type: string
           format: date-time
+        media:
+          type: array
+          items:
+            $ref: '#/components/schemas/Attachment'
         unavailable:
           type: boolean
       required:
@@ -4161,10 +4531,12 @@ components:
       enum:
       - artist
       - organizer
+      - venue
       type: string
       description: |-
         * `artist` - artist
         * `organizer` - organizer
+        * `venue` - venue
     Skill:
       type: object
       properties:
@@ -4281,6 +4653,9 @@ components:
         name:
           type: string
           maxLength: 120
+        headline:
+          type: string
+          maxLength: 160
         description:
           type: string
           maxLength: 4000
@@ -4295,6 +4670,32 @@ components:
           maximum: 2147483647
           minimum: 0
           nullable: true
+        starting_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+        currency:
+          type: string
+          maxLength: 3
+        payment_terms:
+          type: string
+          maxLength: 1000
+        amenities:
+          type: string
+          maxLength: 1000
+        is_listed:
+          type: boolean
+        photos:
+          type: array
+          items:
+            $ref: '#/components/schemas/VenuePhoto'
+          readOnly: true
+        managers:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserSummary'
+          readOnly: true
         viewer_is_manager:
           type: boolean
           readOnly: true
@@ -4309,9 +4710,104 @@ components:
       required:
       - created_at
       - id
+      - managers
       - name
+      - photos
       - updated_at
       - viewer_is_manager
+    VenueBlockInputRequest:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        message:
+          type: string
+          default: ''
+          maxLength: 1000
+      required:
+      - date
+    VenueBooking:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        venue:
+          allOf:
+          - $ref: '#/components/schemas/BookedVenue'
+          readOnly: true
+        requester:
+          allOf:
+          - $ref: '#/components/schemas/UserSummary'
+          readOnly: true
+        date:
+          type: string
+          format: date
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/VenueBookingStatus'
+          readOnly: true
+          default: requested
+        message:
+          type: string
+          readOnly: true
+        expected_headcount:
+          type: integer
+          readOnly: true
+          nullable: true
+        decided_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - date
+      - decided_at
+      - expected_headcount
+      - id
+      - message
+      - requester
+      - status
+      - venue
+    VenueBookingInputRequest:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        message:
+          type: string
+          default: ''
+          maxLength: 1000
+        expected_headcount:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          nullable: true
+      required:
+      - date
+    VenueBookingStatus:
+      enum:
+      - requested
+      - confirmed
+      - declined
+      - cancelled
+      - blocked
+      type: string
+      description: |-
+        * `requested` - Requested
+        * `confirmed` - Confirmed
+        * `declined` - Declined
+        * `cancelled` - Cancelled
+        * `blocked` - Blocked
     VenueManager:
       type: object
       properties:
@@ -4328,6 +4824,20 @@ components:
           format: uuid
       required:
       - user_id
+    VenuePhoto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        url:
+          type: string
+      required:
+      - id
+      - kind
+      - url
     VenueRef:
       type: object
       properties:
@@ -4365,6 +4875,9 @@ components:
           type: string
           minLength: 1
           maxLength: 120
+        headline:
+          type: string
+          maxLength: 160
         description:
           type: string
           maxLength: 4000
@@ -4379,6 +4892,30 @@ components:
           maximum: 2147483647
           minimum: 0
           nullable: true
+        starting_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+        currency:
+          type: string
+          minLength: 1
+          maxLength: 3
+        payment_terms:
+          type: string
+          maxLength: 1000
+        amenities:
+          type: string
+          maxLength: 1000
+        is_listed:
+          type: boolean
+        photo_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          writeOnly: true
+          maxItems: 8
       required:
       - name
     VerificationStatusEnum:

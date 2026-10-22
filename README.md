@@ -118,3 +118,18 @@ The whole app (Next.js in front, Django behind it, plus Postgres) deploys as one
    The APK on the `equra-android-latest` release then opens the hosted app with real login.
 
 Free Render services sleep after 15 minutes idle; the first request after that takes about a minute.
+
+## Venues and media (added)
+
+- **Venues** (`/api/v1/venues/…`): accounts with the `venue` (or `organizer`) role list a venue with a
+  one-line pitch, capacity, starting price, payment terms and photos. Hosts check
+  `availability/`, request a date (`bookings/`), and venue managers confirm, decline or block dates
+  (`/api/v1/venue-bookings/<id>/confirm|decline|cancel/`, `venues/<id>/blocks/`). One confirmed or
+  blocked booking per venue per date is enforced by a partial unique constraint; confirmations lock
+  the venue row first (venue → booking lock order) so concurrent confirms queue instead of deadlocking.
+  Payment is described, not processed: money moves between host and venue directly for now.
+- **Photos and videos** (`POST /api/v1/media/`, multipart `file`): type is detected from file bytes
+  (JPEG/PNG/WebP/GIF, MP4/MOV/WebM; never SVG/HTML), images ≤ 8 MB (the app shrinks them on the
+  phone first), videos ≤ 25 MB. Attach up to 4 to a post with `media_ids`. Bytes are stored in
+  Postgres because the free host's disk is wiped on restart; move to S3/R2 when usage grows.
+- Demo venue login: `venue@demo.equra` / `equra-demo-2026`.

@@ -113,10 +113,19 @@ class Venue(TimeStampedModel):
     """A venue is its own entity managed by explicitly assigned accounts, not a person."""
 
     name = models.CharField(max_length=120)
+    headline = models.CharField(max_length=160, blank=True)  # one-line pitch, LinkedIn style
     description = models.TextField(max_length=4000, blank=True)
     city = models.CharField(max_length=120, blank=True)
     address_text = models.CharField(max_length=255, blank=True)
     capacity = models.PositiveIntegerField(null=True, blank=True)
+    # Pricing is described, not charged: the venue states its price and how it takes
+    # payment (advance, UPI, bank transfer); money moves outside the app for now.
+    starting_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    currency = models.CharField(max_length=3, default="INR")
+    payment_terms = models.TextField(max_length=1000, blank=True)
+    amenities = models.TextField(max_length=1000, blank=True)  # one per line
+    photos = models.ManyToManyField("media.MediaAsset", blank=True, related_name="+")
+    is_listed = models.BooleanField(default=True)  # bookable in the venue directory
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
     )
@@ -143,4 +152,52 @@ class VenueMembership(models.Model):
         db_table = "venue_memberships"
         constraints = [
             models.UniqueConstraint(fields=["venue", "user"], name="uniq_venue_member"),
+        ]
+
+
+class VenueBooking(TimeStampedModel):
+    """A request to book a venue for one date, or a date the venue blocked itself.
+
+    The partial unique constraint is the real guarantee against double-booking: whatever
+    races happen in the app, Postgres will never hold two confirmed/blocked rows for the
+    same venue and date.
+    """
+
+    class Status(models.TextChoices):
+        REQUESTED = "requested"
+        CONFIRMED = "confirmed"
+        DECLINED = "declined"
+        CANCELLED = "cancelled"
+        BLOCKED = "blocked"  # the venue marked the date unavailable
+
+    TAKEN = (Status.CONFIRMED, Status.BLOCKED)
+
+    venue = models.ForeignKey(Venue, on_delete=models.CASCADE, related_name="bookings")
+    requester = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="venue_bookings"
+    )
+    date = models.DateField()
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.REQUESTED)
+    message = models.TextField(max_length=1000, blank=True)
+    expected_headcount = models.PositiveIntegerField(null=True, blank=True)
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    decided_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "venue_bookings"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["venue", "date"], condition=models.Q(status__in=["confirmed", "blocked"]),
+                name="uniq_venue_date_taken",
+            ),
+            models.UniqueConstraint(
+                fields=["venue", "date", "requester"], condition=models.Q(status="requested"),
+                name="uniq_open_venue_request",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["venue", "date"]),
+            models.Index(fields=["requester", "-created_at"]),
         ]

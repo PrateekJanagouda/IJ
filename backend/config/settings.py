@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "apps.opportunities",
     "apps.messaging",
     "apps.notifications",
+    "apps.media",
 ]
 
 MIDDLEWARE = [
@@ -201,6 +202,8 @@ REST_FRAMEWORK = {
         "messages": env("THROTTLE_MESSAGES", "60/min"),
         "conversations": env("THROTTLE_CONVERSATIONS", "30/hour"),
         "reports": env("THROTTLE_REPORTS", "20/hour"),
+        "media": env("THROTTLE_MEDIA", "60/hour"),
+        "venue_bookings": env("THROTTLE_VENUE_BOOKINGS", "30/hour"),
     },
 }
 if DEBUG:
@@ -221,7 +224,9 @@ SPECTACULAR_SETTINGS = {
         "BookingStatus": "apps.opportunities.models.Booking.Status",
         "ReportStatus": "apps.trust_safety.models.Report.Status",
         "AccountStatus": "apps.identity.models.AccountStatus",
-        "SelfServiceRole": ["artist", "organizer"],
+        "SelfServiceRole": ["artist", "organizer", "venue"],
+        "VenueBookingStatus": "apps.profiles.models.VenueBooking.Status",
+        "MediaKind": "apps.media.models.MediaAsset.Kind",
     },
 }
 
