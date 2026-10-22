@@ -123,9 +123,10 @@ Free Render services sleep after 15 minutes idle; the first request after that t
 
 - **Venues** (`/api/v1/venues/…`): accounts with the `venue` (or `organizer`) role list a venue with a
   one-line pitch, capacity, starting price, payment terms and photos. Hosts check
-  `availability/`, request a date (`bookings/`), and venue managers confirm, decline or block dates
+  `availability/`, request a time slot (`bookings/`), and venue managers confirm, decline or block dates
   (`/api/v1/venue-bookings/<id>/confirm|decline|cancel/`, `venues/<id>/blocks/`). One confirmed or
-  blocked booking per venue per date is enforced by a partial unique constraint; confirmations lock
+  blocked time slot per venue at any moment is enforced by a Postgres exclusion constraint on
+  overlapping time ranges (slots can cross midnight); confirmations lock
   the venue row first (venue → booking lock order) so concurrent confirms queue instead of deadlocking.
   Payment is described, not processed: money moves between host and venue directly for now.
 - **Photos and videos** (`POST /api/v1/media/`, multipart `file`): type is detected from file bytes

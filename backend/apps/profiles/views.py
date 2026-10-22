@@ -177,7 +177,8 @@ class VenueAvailabilityView(GenericAPIView):
     def get(self, request, venue_id):
         venue = services.get_venue(venue_id)
         start = request.query_params.get("start")
-        start = serializers.DateField().run_validation(start) if start else timezone.localdate()
+        start = (serializers.DateField().run_validation(start) if start
+                 else timezone.localtime(timezone.now(), services.VENUE_TZ).date())
         days = serializers.IntegerField(min_value=1, max_value=92).run_validation(
             request.query_params.get("days", 42))
         result = services.availability(request.user, venue, start, days)
@@ -213,7 +214,7 @@ class VenueBlockView(GenericAPIView):
         venue = services.get_venue(venue_id)
         data = VenueBlockInputSerializer(data=request.data)
         data.is_valid(raise_exception=True)
-        booking = services.block_date(request.user, venue, **data.validated_data)
+        booking = services.block_slot(request.user, venue, **data.validated_data)
         return Response(self.get_serializer(booking).data, status=status.HTTP_201_CREATED)
 
 

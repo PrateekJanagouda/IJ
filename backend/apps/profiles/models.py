@@ -1,5 +1,8 @@
 from django.conf import settings
+from django.contrib.postgres.constraints import ExclusionConstraint
+from django.contrib.postgres.fields import RangeOperators
 from django.db import models
+from django.db.models import Func
 
 from shared.models import TimeStampedModel
 
@@ -155,12 +158,17 @@ class VenueMembership(models.Model):
         ]
 
 
-class VenueBooking(TimeStampedModel):
-    """A request to book a venue for one date, or a date the venue blocked itself.
+class TsTzRange(Func):
+    function = "TSTZRANGE"
+    output_field = models.DateTimeField()  # only used inside the exclusion constraint
 
-    The partial unique constraint is the real guarantee against double-booking: whatever
-    races happen in the app, Postgres will never hold two confirmed/blocked rows for the
-    same venue and date.
+
+class VenueBooking(TimeStampedModel):
+    """A request to book a venue for a time slot, or a slot the venue blocked itself.
+
+    The exclusion constraint is the real guarantee against double-booking: whatever races
+    happen in the app, Postgres never holds two confirmed/blocked slots at one venue whose
+    time ranges overlap. Ranges are half-open [start, end), so 6-9pm and 9-11pm can coexist.
     """
 
     class Status(models.TextChoices):
@@ -176,7 +184,9 @@ class VenueBooking(TimeStampedModel):
     requester = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="venue_bookings"
     )
-    date = models.DateField()
+    date = models.DateField()  # local (venue) date the slot starts on; drives the calendar
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.REQUESTED)
     message = models.TextField(max_length=1000, blank=True)
     expected_headcount = models.PositiveIntegerField(null=True, blank=True)
@@ -188,16 +198,21 @@ class VenueBooking(TimeStampedModel):
     class Meta:
         db_table = "venue_bookings"
         constraints = [
-            models.UniqueConstraint(
-                fields=["venue", "date"], condition=models.Q(status__in=["confirmed", "blocked"]),
-                name="uniq_venue_date_taken",
+            models.CheckConstraint(condition=models.Q(ends_at__gt=models.F("starts_at")),
+                                   name="venue_booking_ends_after_start"),
+            ExclusionConstraint(
+                name="no_overlapping_venue_slots",
+                expressions=[("venue", RangeOperators.EQUAL),
+                             (TsTzRange("starts_at", "ends_at"), RangeOperators.OVERLAPS)],
+                condition=models.Q(status__in=["confirmed", "blocked"]),
             ),
             models.UniqueConstraint(
-                fields=["venue", "date", "requester"], condition=models.Q(status="requested"),
+                fields=["venue", "requester", "starts_at"], condition=models.Q(status="requested"),
                 name="uniq_open_venue_request",
             ),
         ]
         indexes = [
             models.Index(fields=["venue", "date"]),
+            models.Index(fields=["venue", "starts_at"]),
             models.Index(fields=["requester", "-created_at"]),
         ]

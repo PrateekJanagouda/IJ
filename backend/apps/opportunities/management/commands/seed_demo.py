@@ -6,7 +6,7 @@ data obeys the same rules, history, audit trail and notifications as real usage.
 All names are fictional. Every demo account uses the password printed at the end.
 """
 
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from django.core.management.base import BaseCommand
@@ -44,7 +44,13 @@ class Command(BaseCommand):
         self._print_logins()
 
     def _seed_venues(self):
-        today = timezone.localdate()
+        ist = ZoneInfo("Asia/Kolkata")
+        today = timezone.localtime(timezone.now(), ist).date()
+
+        def slot(days, start_h, hours):
+            starts = datetime.combine(today + timedelta(days=days), time(start_h), ist)
+            return {"starts_at": starts, "ends_at": starts + timedelta(hours=hours)}
+
         karan = self._user(
             "venue@demo.equra", "Karan Malhotra", ["venue"],
             {"headline": "Runs The Attic and Courtyard 22", "location_label": "Bengaluru",
@@ -77,14 +83,15 @@ class Command(BaseCommand):
         rohan = User.objects.filter(email="rohan@demo.equra").first()
         olivia = User.objects.filter(email="olivia@demo.equra").first()
         if rohan:
-            b = profiles.request_booking(rohan, loft, date=today + timedelta(days=5),
+            b = profiles.request_booking(rohan, loft, **slot(5, 19, 4),
                                          message="Jazz night, about 90 people.", expected_headcount=90)
             profiles.decide_booking(karan, b.id, "confirmed")
         if olivia:
-            profiles.request_booking(olivia, loft, date=today + timedelta(days=9),
+            profiles.request_booking(olivia, loft, **slot(9, 20, 5),
                                      message="Album launch for one of our regulars. Ticketed, ~100.",
                                      expected_headcount=100)
-        profiles.block_date(karan, loft, date=today + timedelta(days=12), message="Private event")
+        profiles.block_slot(karan, loft, **slot(12, 10, 14), message="Private event")
+        profiles.block_slot(karan, loft, **slot(5, 12, 4), message="Afternoon workshop")
 
     def _print_logins(self):
         self.stdout.write(f"  artist:    asha@demo.equra / {PASSWORD}")

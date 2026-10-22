@@ -202,25 +202,30 @@ class VenueBookingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = VenueBooking
-        fields = ["id", "venue", "requester", "date", "status", "message", "expected_headcount",
-                  "decided_at", "created_at"]
+        fields = ["id", "venue", "requester", "date", "starts_at", "ends_at", "status", "message",
+                  "expected_headcount", "decided_at", "created_at"]
         read_only_fields = fields
 
 
 class VenueBookingInputSerializer(serializers.Serializer):
-    date = serializers.DateField()
+    """Send times with an offset, e.g. 2026-10-24T20:00:00+05:30. Slots may cross midnight."""
+
+    starts_at = serializers.DateTimeField()
+    ends_at = serializers.DateTimeField()
     message = serializers.CharField(max_length=1000, required=False, allow_blank=True, default="")
     expected_headcount = serializers.IntegerField(min_value=1, max_value=100000, required=False,
                                                   allow_null=True, default=None)
 
 
 class VenueBlockInputSerializer(serializers.Serializer):
-    date = serializers.DateField()
+    starts_at = serializers.DateTimeField()
+    ends_at = serializers.DateTimeField()
     message = serializers.CharField(max_length=1000, required=False, allow_blank=True, default="")
 
 
-class AvailabilityDaySerializer(serializers.Serializer):
-    date = serializers.DateField()
+class AvailabilitySlotSerializer(serializers.Serializer):
+    starts_at = serializers.DateTimeField()
+    ends_at = serializers.DateTimeField()
     status = serializers.ChoiceField(
         choices=["booked", "blocked", "requested_by_you", "has_requests"])
 
@@ -228,7 +233,7 @@ class AvailabilityDaySerializer(serializers.Serializer):
 class AvailabilitySerializer(serializers.Serializer):
     start = serializers.DateField()
     end = serializers.DateField()
-    days = AvailabilityDaySerializer(many=True)
+    slots = AvailabilitySlotSerializer(many=True)
 
 
 class VenueManagerSerializer(serializers.Serializer):

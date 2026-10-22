@@ -92,16 +92,20 @@ def test_concurrent_conversation_starts_converge_on_one_conversation():
 
 
 def test_concurrent_venue_confirmations_never_double_book():
+    """Five overlapping requests, five simultaneous confirms: exactly one slot is booked,
+    the rest fail cleanly (no deadlocks, no overlap)."""
     from apps.profiles import services as profile_services
     from apps.profiles.models import Venue, VenueBooking, VenueMembership
 
     owner = make_user("venue-owner@example.com", Role.VENUE)
     venue = Venue.objects.create(name="Loft", created_by=owner)
     VenueMembership.objects.create(venue=venue, user=owner)
-    date = timezone.localdate() + timedelta(days=7)
+    base = timezone.now().replace(microsecond=0) + timedelta(days=7)
     requests = [
-        VenueBooking.objects.create(venue=venue, date=date,
-                                    requester=make_user(f"o{i}@example.com", Role.ORGANIZER))
+        VenueBooking.objects.create(
+            venue=venue, date=base.date(), starts_at=base + timedelta(minutes=30 * i),
+            ends_at=base + timedelta(hours=3, minutes=30 * i),
+            requester=make_user(f"o{i}@example.com", Role.ORGANIZER))
         for i in range(5)
     ]
 
@@ -112,4 +116,4 @@ def test_concurrent_venue_confirmations_never_double_book():
 
     assert len([r for r in results if r[0] == "ok"]) == 1
     assert all(isinstance(r[1], Conflict) for r in results if r[0] == "err")
-    assert VenueBooking.objects.filter(venue=venue, date=date, status="confirmed").count() == 1
+    assert VenueBooking.objects.filter(venue=venue, status="confirmed").count() == 1

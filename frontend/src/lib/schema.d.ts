@@ -1509,12 +1509,14 @@ export interface components {
             start: string;
             /** Format: date */
             end: string;
-            days: components["schemas"]["AvailabilityDay"][];
+            slots: components["schemas"]["AvailabilitySlot"][];
         };
-        AvailabilityDay: {
-            /** Format: date */
-            date: string;
-            status: components["schemas"]["AvailabilityDayStatusEnum"];
+        AvailabilitySlot: {
+            /** Format: date-time */
+            starts_at: string;
+            /** Format: date-time */
+            ends_at: string;
+            status: components["schemas"]["AvailabilitySlotStatusEnum"];
         };
         /**
          * @description * `booked` - booked
@@ -1523,7 +1525,7 @@ export interface components {
          *     * `has_requests` - has_requests
          * @enum {string}
          */
-        AvailabilityDayStatusEnum: "booked" | "blocked" | "requested_by_you" | "has_requests";
+        AvailabilitySlotStatusEnum: "booked" | "blocked" | "requested_by_you" | "has_requests";
         Block: {
             readonly user: components["schemas"]["UserSummary"];
             /** Format: date-time */
@@ -2404,8 +2406,10 @@ export interface components {
             readonly updated_at: string;
         };
         VenueBlockInputRequest: {
-            /** Format: date */
-            date: string;
+            /** Format: date-time */
+            starts_at: string;
+            /** Format: date-time */
+            ends_at: string;
             /** @default  */
             message: string;
         };
@@ -2416,6 +2420,10 @@ export interface components {
             readonly requester: components["schemas"]["UserSummary"];
             /** Format: date */
             readonly date: string;
+            /** Format: date-time */
+            readonly starts_at: string;
+            /** Format: date-time */
+            readonly ends_at: string;
             /** @default requested */
             readonly status: components["schemas"]["VenueBookingStatus"];
             readonly message: string;
@@ -2425,9 +2433,12 @@ export interface components {
             /** Format: date-time */
             readonly created_at: string;
         };
+        /** @description Send times with an offset, e.g. 2026-10-24T20:00:00+05:30. Slots may cross midnight. */
         VenueBookingInputRequest: {
-            /** Format: date */
-            date: string;
+            /** Format: date-time */
+            starts_at: string;
+            /** Format: date-time */
+            ends_at: string;
             /** @default  */
             message: string;
             expected_headcount?: number | null;

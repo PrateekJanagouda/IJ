@@ -408,6 +408,13 @@ button { cursor: pointer; background: none; border: 0; padding: 0; text-align: i
 .cal .day.blocked { background: repeating-linear-gradient(135deg, var(--sunk) 0 4px, transparent 4px 8px); color: var(--ink-3); }
 .cal .day.requested_by_you { background: color-mix(in srgb, var(--yellow) 35%, transparent); }
 .cal .day.has_requests { background: color-mix(in srgb, var(--pink) 30%, transparent); }
+.cal .day.busy { background: linear-gradient(135deg, color-mix(in srgb, var(--teal) 16%, transparent) 50%, var(--sunk) 50%); }
+.legend i.busy { background: linear-gradient(135deg, color-mix(in srgb, var(--teal) 30%, transparent) 50%, var(--ink-3) 50%); }
+.daypanel { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; padding: 14px; border-radius: 18px; border: 1.5px solid var(--pink); background: var(--card); }
+.slot { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 12px; background: var(--sunk); font-weight: 650; font-size: 14px; }
+.slot > span:first-child { flex: 1; }
+.slot.booked .tiny, .slot.blocked .tiny { color: var(--ink-3); }
+.slot.requested_by_you { background: color-mix(in srgb, var(--yellow) 25%, transparent); }
 .cal .day.past { color: var(--ink-3); opacity: .45; }
 .cal .day.today { border-color: var(--ink-3); }
 .cal .day.sel { border-color: var(--pink); box-shadow: 0 0 0 2px var(--pink); }
@@ -530,7 +537,8 @@ function toNotif(S, n) {
   if (n.actor) addUser(S, n.actor);
   return { id: n.id, actor: n.actor?.id, type: n.notification_type, gig: n.payload?.opportunity_id || null, gigTitle: n.payload?.opportunity_title || "",
     post: n.resource_type === "post" ? n.resource_id : null, convo: n.resource_type === "conversation" ? n.resource_id : null, at: n.created_at, read: n.is_read,
-    venue: n.payload?.venue_id || null, venueName: n.payload?.venue_name || "", date: n.payload?.date || null };
+    venue: n.payload?.venue_id || null, venueName: n.payload?.venue_name || "", date: n.payload?.date || null,
+    starts: n.payload?.starts_at || null, ends: n.payload?.ends_at || null };
 }
 function toVenue(S, v) {
   (v.managers || []).forEach((m) => addUser(S, m));
@@ -539,7 +547,8 @@ function toVenue(S, v) {
     listed: v.is_listed, photos: v.photos || [], managers: (v.managers || []).map((m) => m.id), mine: !!v.viewer_is_manager };
 }
 const toVB = (S, b) => { addUser(S, b.requester);
-  return { id: b.id, venue: b.venue.id, venueName: b.venue.name, requester: b.requester.id, date: b.date, status: b.status, message: b.message || "", headcount: b.expected_headcount, at: b.created_at }; };
+  return { id: b.id, venue: b.venue.id, venueName: b.venue.name, requester: b.requester.id, date: b.date, starts: b.starts_at, ends: b.ends_at,
+    status: b.status, message: b.message || "", headcount: b.expected_headcount, at: b.created_at }; };
 
 /** Pull everything this viewer can see. Builds a fresh state, then swaps it in. */
 async function refresh() {
@@ -585,7 +594,8 @@ async function loadProfile(userId) {
   try { fromProfile(S, await api(`/profiles/${u.profileId}`)); render(); } catch {}
 }
 async function loadAvail(venueId) {
-  try { const r = await api(`/venues/${venueId}/availability?days=92`); S.avail[venueId] = Object.fromEntries(r.days.map((d) => [d.date, d.status])); render(); } catch {}
+  try { const r = await api(`/venues/${venueId}/availability?days=92`);
+    S.avail[venueId] = r.slots.map((x) => ({ starts: x.starts_at, ends: x.ends_at, status: x.status, day: istDayOf(x.starts_at) })); render(); } catch {}
 }
 async function loadComments(postId) {
   try { const rows = await list(`/posts/${postId}/comments`); rows.forEach((c) => addUser(S, c.author));
@@ -633,6 +643,7 @@ function closes(iso) {
   if (d <= 1) return `Closes ${d === 0 ? "today" : "tomorrow"} ${time(iso)}`;
   return `Closes ${wk(iso)} ${time(iso)}`;
 }
+const agoText = (iso) => { const a = ago2(iso); return a === "now" ? "just now" : `${a} ago`; };
 function ago2(iso) {
   const s = Math.max(1, (Date.now() - new Date(iso)) / 1000);
   if (s < 60) return "now"; if (s < 3600) return `${Math.round(s / 60)}m`; if (s < 86400) return `${Math.round(s / 3600)}h`; return `${Math.round(s / 86400)}d`;
@@ -831,20 +842,35 @@ function venueCard(v) {
 }
 function requestRow(b) {
   return `<div class="track"><div class="row">${av(b.requester)}<button class="col grow" style="gap:0;text-align:left" data-a="profile" data-id="${b.requester}"><b>${esc(nm(b.requester))}</b>
-      <span class="tiny muted">${prettyDay(b.date)}${b.headcount ? ` · ~${b.headcount} people` : ""} · asked ${ago2(b.at)} ago</span></button></div>
+      <span class="tiny muted">${prettyDay(istDayOf(b.starts))}, ${slotLabel(b.starts, b.ends)}${b.headcount ? ` · ~${b.headcount} people` : ""} · asked ${agoText(b.at)}</span></button></div>
     ${b.message ? `<div class="note pre">${esc(b.message)}</div>` : ""}
     <div class="row"><button class="btn sm bad grow" data-a="vdecide" data-id="${b.id}" data-to="decline">Decline</button><button class="btn sm line" data-a="message" data-id="${b.requester}">Message</button>
       <button class="btn sm pink grow" data-a="vdecide" data-id="${b.id}" data-to="confirm">${ic("check", 16)} Confirm</button></div></div>`;
 }
 const isoDay = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const todayIso = () => isoDay(new Date(Date.now() + (330 + new Date().getTimezoneOffset()) * 60000)); // India date
+const istDayOf = (iso) => isoDay(new Date(new Date(iso).getTime() + (330 + new Date().getTimezoneOffset()) * 60000));
+const slotLabel = (s, e) => `${time(s)}–${time(e)}${istDayOf(e) !== istDayOf(s) && time(e) !== "12am" ? " (next day)" : ""}`;
+const TIMES = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`);
+const PRESETS = [["Afternoon", "12:00", "17:00"], ["Evening", "18:00", "23:00"], ["Late night", "21:00", "02:00"], ["Full day", "10:00", "23:00"]];
+/** The chosen slot as ISO strings with the venue's offset; an end at or before the start is next day. */
+function chosenSlot(day, start, end) {
+  const s = new Date(`${day}T${start}:00+05:30`); let e = new Date(`${day}T${end}:00+05:30`);
+  if (e <= s) e = new Date(e.getTime() + DAY);
+  return { starts_at: s.toISOString(), ends_at: e.toISOString() };
+}
+const overlaps = (a, b) => new Date(a.starts_at) < new Date(b.ends) && new Date(b.starts) < new Date(a.ends_at);
 const prettyDay = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 function calendar(v) {
-  const marks = S.avail[v.id], cal = ui.cal?.venue === v.id ? ui.cal : { off: 0, sel: null };
+  const slots = S.avail[v.id], cal = ui.cal?.venue === v.id ? ui.cal : { off: 0, sel: null };
+  const marks = slots && Object.fromEntries([...new Set(slots.map((x) => x.day))].map((d) => {
+    const st = slots.filter((x) => x.day === d).map((x) => x.status);
+    return [d, st.includes("requested_by_you") ? "requested_by_you" : st.includes("has_requests") ? "has_requests" : "busy"];
+  }));
   const today = todayIso(), t = new Date(today + "T12:00:00"), max = isoDay(new Date(t.getTime() + 91 * DAY));
   const first = new Date(t.getFullYear(), t.getMonth() + cal.off, 1), lead = (first.getDay() + 6) % 7;
   const days = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
-  const label = { booked: "Booked", blocked: "Unavailable", requested_by_you: "Your request", has_requests: "Requests waiting" };
+  const label = { busy: "Some times taken", requested_by_you: "Your request", has_requests: "Requests waiting" };
   let cells = Array.from({ length: lead }, () => `<span></span>`).join("");
   for (let d = 1; d <= days; d++) {
     const iso = isoDay(new Date(first.getFullYear(), first.getMonth(), d)), m = marks?.[iso];
@@ -854,7 +880,27 @@ function calendar(v) {
   return `<div class="cal"><div class="row" style="justify-content:space-between"><button class="icon-btn" data-a="calnav" data-id="-1" ${cal.off <= 0 ? "disabled" : ""} aria-label="Previous month">${ic("left", 18)}</button>
       <b>${first.toLocaleDateString("en-IN", { month: "long", year: "numeric" })}</b><button class="icon-btn" data-a="calnav" data-id="1" ${cal.off >= 2 ? "disabled" : ""} aria-label="Next month">${ic("right", 18)}</button></div>
     <div class="cal-grid">${["M", "T", "W", "T", "F", "S", "S"].map((x) => `<span class="dow">${x}</span>`).join("")}${marks ? cells : `<span style="grid-column:1/-1" class="small muted">Loading availability…</span>`}</div>
-    <div class="legend"><span><i class="free"></i>Free</span><span><i class="booked"></i>Booked</span><span><i class="requested_by_you"></i>Your request</span>${v.mine ? `<span><i class="has_requests"></i>Requests</span>` : ""}<span><i class="blocked"></i>Unavailable</span></div></div>`;
+    <div class="legend"><span><i class="free"></i>Free</span><span><i class="busy"></i>Some times taken</span><span><i class="requested_by_you"></i>Your request</span>${v.mine ? `<span><i class="has_requests"></i>Requests</span>` : ""}</div></div>`;
+}
+/** The selected day: what's taken, a time picker, and a live clash check. */
+function dayPanel(v) {
+  const cal = ui.cal, day = cal.sel, slots = (S.avail[v.id] || []).filter((x) => x.day === day || istDayOf(x.ends) === day);
+  const taken = slots.filter((x) => x.status === "booked" || x.status === "blocked");
+  const pick = chosenSlot(day, cal.start, cal.end), clash = taken.find((x) => overlaps(pick, x));
+  const opt = (sel) => TIMES.map((t) => `<option value="${t}" ${t === sel ? "selected" : ""}>${time(`${day}T${t}:00+05:30`)}</option>`).join("");
+  const mine = v.mine ? (S.venueBookings[v.id] || []).filter((b) => istDayOf(b.starts) === day) : [];
+  const myReqs = S.venueReqs.filter((b) => b.venue === v.id && istDayOf(b.starts) === day && ["requested", "confirmed"].includes(b.status));
+  return `<div class="daypanel"><b>${prettyDay(day)}</b>
+    ${taken.length ? `<div class="col" style="gap:6px"><span class="eyebrow">Already taken</span>${taken.map((x) => {
+      const blk = v.mine && x.status === "blocked" && mine.find((b) => b.status === "blocked" && b.starts === x.starts);
+      return `<div class="slot ${x.status}"><span>${slotLabel(x.starts, x.ends)}</span><span class="tiny">${x.status === "booked" ? "Booked" : "Unavailable"}</span>${blk ? `<button class="btn sm line" data-a="unblock" data-id="${blk.id}">Unblock</button>` : ""}</div>`;
+    }).join("")}</div>` : `<span class="small muted">Nothing booked yet. The whole day is open.</span>`}
+    ${myReqs.map((b) => `<div class="slot requested_by_you"><span>${slotLabel(b.starts, b.ends)}</span><span class="tiny">${b.status === "confirmed" ? "Your booking" : "Your request"}</span>${b.status === "requested" ? `<button class="btn sm line" data-a="cancelvreq" data-id="${b.id}">Cancel</button>` : ""}</div>`).join("")}
+    <span class="eyebrow">${v.mine ? "Block a time" : "Choose your time"}</span>
+    <div class="chips" style="margin:0;padding:0;flex-wrap:wrap">${PRESETS.map(([n, a, b]) => `<button class="chip ${cal.start === a && cal.end === b ? "on" : ""}" data-a="preset" data-id="${a}|${b}">${n}</button>`).join("")}</div>
+    <div class="row"><div class="field grow"><label for="sl-start">From</label><select id="sl-start" class="select" data-slot="start">${opt(cal.start)}</select></div>
+      <div class="field grow"><label for="sl-end">To</label><select id="sl-end" class="select" data-slot="end">${opt(cal.end)}</select></div></div>
+    <div class="small ${clash ? "" : "muted"}" style="${clash ? "color:var(--bad);font-weight:650" : ""}">${clash ? `Overlaps ${slotLabel(clash.starts, clash.ends)}. Pick another time.` : `${slotLabel(pick.starts_at, pick.ends_at)} is free.`}</div></div>`;
 }
 
 function welcomeHero() {
@@ -950,7 +996,7 @@ const screens = {
         if (isBooked(r)) foot = ui.confirm === b.id
           ? `<div class="col"><span class="small">Cancel this booking? ${esc(hostName)} will be told right away and the spot reopens.</span><div class="row"><button class="btn sm bad grow" data-a="cancelbooking" data-id="${b.id}">Cancel booking</button><button class="btn sm line grow" data-a="keep">Keep it</button></div></div>`
           : `<div class="row"><button class="btn sm pink grow" data-a="message" data-id="${g.owner}">Message ${esc(hostName)}</button><button class="btn sm line" data-a="askcancel" data-id="${b.id}">Can't make it</button></div>`;
-        else if (review.includes(r)) foot = `<div class="row"><span class="tiny muted grow">${a.status === "shortlisted" ? `You're on ${esc(hostName)}'s shortlist. ${esc(closes(g.deadline))}.` : `Sent ${ago2(a.at)} ago. ${esc(closes(g.deadline))}.`}</span><button class="btn sm line" data-a="withdraw" data-id="${a.id}">Withdraw</button></div>`;
+        else if (review.includes(r)) foot = `<div class="row"><span class="tiny muted grow">${a.status === "shortlisted" ? `You're on ${esc(hostName)}'s shortlist. ${esc(closes(g.deadline))}.` : `Sent ${agoText(a.at)}. ${esc(closes(g.deadline))}.`}</span><button class="btn sm line" data-a="withdraw" data-id="${a.id}">Withdraw</button></div>`;
         return `<div class="track ${isBooked(r) ? "booked" : ""}"><button class="row" style="width:100%;text-align:left" data-a="gig" data-id="${g.id}">${thumb(g, 52)}
           <span class="col grow" style="gap:2px"><b class="ellipsis">${esc(g.title)}</b><span class="tiny muted ellipsis">${esc(g.venue)} · ${wk(g.starts)} ${time(g.starts)}${isBooked(r) ? ` · ${relDay(g.starts)}` : ""}</span></span></button>${journey(a, b)}${foot}</div>`; };
       const group = (title, items) => items.length ? `<section class="section"><div class="section-head"><h3>${title}</h3><span class="tiny faint mono">${items.length}</span></div>${items.map(card).join("")}</section>` : "";
@@ -958,19 +1004,19 @@ const screens = {
         : emptyState("No applications yet", "Apply to a gig and follow it here, from applied to played.", `<button class="btn sm pink" data-a="tab" data-id="gigs">Find gigs</button>`);
     } else if (view === "venue") {
       body = (myVenues.length ? myVenues.map((v) => {
-        const rows = (S.venueBookings[v.id] || []).filter((b) => b.date >= todayIso());
+        const rows = (S.venueBookings[v.id] || []).filter((b) => new Date(b.ends) > new Date());
         const waiting = rows.filter((b) => b.status === "requested"), upcoming = rows.filter((b) => b.status === "confirmed");
         return `${venueCard(v)}${waiting.length ? `<section class="section" style="gap:8px"><div class="section-head"><h3>Requests</h3><span class="tiny faint mono">${waiting.length}</span></div>${waiting.map(requestRow).join("")}</section>` : ""}
-          ${upcoming.length ? `<section class="section" style="gap:0"><span class="eyebrow">Confirmed</span>${upcoming.map((b) => `<div class="list-row">${av(b.requester, "sm")}<span class="grow small"><b>${prettyDay(b.date)}</b> · ${esc(nm(b.requester))}</span>${st("confirmed")}</div>`).join("")}</section>` : ""}
+          ${upcoming.length ? `<section class="section" style="gap:0"><span class="eyebrow">Confirmed</span>${upcoming.map((b) => `<div class="list-row">${av(b.requester, "sm")}<span class="grow small"><b>${prettyDay(istDayOf(b.starts))}, ${slotLabel(b.starts, b.ends)}</b> · ${esc(nm(b.requester))}</span>${st("confirmed")}</div>`).join("")}</section>` : ""}
           ${!waiting.length && !upcoming.length ? `<div class="small muted">No requests yet. Share your venue so hosts can find it.</div>` : ""}`;
       }).join("") : emptyState("List your venue", "Hosts pick a free date and send you a request. You confirm, they pay you directly."))
         + `<button class="btn ${myVenues.length ? "line" : "pink"} block" data-a="venueform">${ic("plus", 18)} ${myVenues.length ? "List another venue" : "List my venue"}</button>`;
     } else {
       const list = S.gigs.filter(manages).sort((a, b) => a.starts.localeCompare(b.starts));
-      const reqs = S.venueReqs.filter((b) => b.date >= todayIso() && ["requested", "confirmed"].includes(b.status));
+      const reqs = S.venueReqs.filter((b) => new Date(b.ends) > new Date() && ["requested", "confirmed"].includes(b.status));
       body = `<div class="row"><button class="btn pink grow" data-a="go" data-id="newgig">${ic("plus", 18)} Post a gig</button><button class="btn line grow" data-a="go" data-id="venues">Find a venue</button></div>`
         + (reqs.length ? `<section class="section" style="gap:0"><span class="eyebrow">Venue bookings</span>${reqs.map((b) => `<button class="list-row" data-a="venue" data-id="${b.venue}">
-          <span class="grow small"><b>${esc(b.venueName)}</b><span class="tiny muted" style="display:block">${prettyDay(b.date)}</span></span>${st(b.status === "confirmed" ? "confirmed" : "submitted", b.status === "confirmed" ? "Confirmed" : "Requested")}</button>`).join("")}</section>` : "")
+          <span class="grow small"><b>${esc(b.venueName)}</b><span class="tiny muted" style="display:block">${prettyDay(istDayOf(b.starts))}, ${slotLabel(b.starts, b.ends)}</span></span>${st(b.status === "confirmed" ? "confirmed" : "submitted", b.status === "confirmed" ? "Confirmed" : "Requested")}</button>`).join("")}</section>` : "")
         + (list.length ? list.map((g) => {
         const waiting = S.apps.filter((x) => x.gig === g.id && ["submitted", "shortlisted"].includes(x.status)).length, bk = booked(g);
         return `<div class="track"><button class="row" style="width:100%;text-align:left" data-a="gig" data-id="${g.id}">${thumb(g, 52)}
@@ -993,21 +1039,19 @@ const screens = {
 
   venue({ id }) {
     const v = S.venues[id]; if (!v) return bar("Venue") + emptyState("Venue not found");
-    const u = me(), cal = ui.cal?.venue === id ? ui.cal : { sel: null }, sel = cal.sel, mark = sel && S.avail[id]?.[sel];
-    const rows = v.mine ? (S.venueBookings[id] || []).filter((b) => b.date >= todayIso()) : [];
-    const mineReq = sel && S.venueReqs.find((b) => b.venue === id && b.date === sel && ["requested", "confirmed"].includes(b.status));
+    const u = me(), cal = ui.cal?.venue === id ? ui.cal : { sel: null }, sel = cal.sel;
+    const rows = v.mine ? (S.venueBookings[id] || []).filter((b) => new Date(b.ends) > new Date()) : [];
+    const pick = sel && chosenSlot(sel, cal.start, cal.end);
+    const clash = pick && (S.avail[id] || []).find((x) => (x.status === "booked" || x.status === "blocked") && overlaps(pick, x));
+    const when = pick && slotLabel(pick.starts_at, pick.ends_at);
     let cta;
     if (!u) cta = `<button class="btn pink block" data-a="login">Sign in to book</button>`;
-    else if (v.mine) cta = !sel ? `<button class="btn line block" data-a="venueform" data-id="${id}">${ic("edit", 16)} Edit listing</button>`
-      : mark === "blocked" ? `<button class="btn line block" data-a="unblock" data-id="${sel}">Make ${prettyDay(sel)} available</button>`
-      : mark === "booked" ? `<button class="btn block" disabled>${prettyDay(sel)} is booked</button>`
-      : `<button class="btn line block" data-a="block" data-id="${sel}">Mark ${prettyDay(sel)} unavailable</button>`;
-    else if (!sel) cta = `<button class="btn block" disabled>Pick a free date on the calendar</button>`;
-    else if (mineReq) cta = mineReq.status === "confirmed" ? `<button class="btn block" disabled>${ic("check", 16)} Booked for ${prettyDay(sel)}</button>`
-      : `<button class="btn line block" data-a="cancelvreq" data-id="${mineReq.id}">Cancel my request for ${prettyDay(sel)}</button>`;
-    else if (mark === "booked" || mark === "blocked") cta = `<button class="btn block" disabled>${prettyDay(sel)} isn't available</button>`;
-    else cta = `<button class="btn pink block" data-a="openvreq" data-id="${id}">Request ${prettyDay(sel)}</button><div class="hint" style="text-align:center">${fromPrice(v)} · no payment taken in the app</div>`;
-    const selRows = sel ? rows.filter((b) => b.date === sel && b.status === "requested") : rows.filter((b) => b.status === "requested");
+    else if (!sel) cta = v.mine ? `<button class="btn line block" data-a="venueform" data-id="${id}">${ic("edit", 16)} Edit listing</button>`
+      : `<button class="btn block" disabled>Pick a date on the calendar</button>`;
+    else if (clash) cta = `<button class="btn block" disabled>That time overlaps a booking</button>`;
+    else if (v.mine) cta = `<button class="btn line block" data-a="block">Block ${prettyDay(sel)}, ${when}</button>`;
+    else cta = `<button class="btn pink block" data-a="openvreq" data-id="${id}">Request ${prettyDay(sel)}, ${when}</button><div class="hint" style="text-align:center">${fromPrice(v)} · no payment taken in the app</div>`;
+    const selRows = rows.filter((b) => b.status === "requested" && (!sel || istDayOf(b.starts) === sel));
     return `<div class="vhero">${venueArt(v, "big")}<div class="float"><button class="float-btn" data-a="back" aria-label="Back">${ic("back", 20)}</button><button class="float-btn" data-a="share" data-id="venues/${id}" aria-label="Share">${ic("share", 18)}</button></div></div>
       ${v.photos.length > 1 ? mediaGrid(v.photos.slice(1)).replace('class="mgrid', 'class="mgrid strip') : ""}
       <div class="page" style="padding-top:16px;padding-bottom:130px">
@@ -1017,7 +1061,7 @@ const screens = {
           <div><span class="eyebrow">Price</span><b style="color:var(--yellow)">${v.price ? `₹${v.price.toLocaleString("en-IN")}` : "Ask"}</b><span class="tiny muted">starting</span></div>
           <div><span class="eyebrow">Booked by</span><b>Date</b><span class="tiny muted">one event a day</span></div></div>
         ${v.terms ? `<div class="terms"><span class="eyebrow">Pricing &amp; payment</span><p class="pre" style="margin:0">${esc(v.terms)}</p></div>` : ""}
-        <section class="section"><div class="section-head"><h3>${v.mine ? "Your calendar" : "Check a date"}</h3></div>${calendar(v)}</section>
+        <section class="section"><div class="section-head"><h3>${v.mine ? "Your calendar" : "Pick a date and time"}</h3></div>${calendar(v)}${sel ? dayPanel(v) : ""}</section>
         ${v.mine && selRows.length ? `<section class="section" style="gap:8px"><div class="section-head"><h3>Requests${sel ? ` for ${prettyDay(sel)}` : ""}</h3></div>${selRows.map(requestRow).join("")}</section>` : ""}
         ${v.desc ? `<section class="section"><span class="eyebrow">About the venue</span><p class="pre" style="margin:0;font-size:16px">${esc(v.desc)}</p></section>` : ""}
         ${v.amenities.length ? `<section class="section"><span class="eyebrow">What you get</span><ul class="checklist">${v.amenities.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></section>` : ""}
@@ -1063,7 +1107,7 @@ const screens = {
         ${overlap.length ? `<div class="row wrap" style="gap:6px">${overlap.map((x) => `<span class="tag match">${ic("star", 11, true)} #${esc(x)}</span>`).join("")}</div>` : ""}
         ${a.note ? `<div class="note pre">${esc(a.note)}</div>` : `<div class="small faint">No note.</div>`}
         ${a.works.length ? `<div class="col" style="gap:8px"><span class="eyebrow">Listen before you book</span>${a.works.map(player).join("")}</div>` : ""}
-        <div class="tiny faint">Applied ${ago2(a.at)} ago</div></div>
+        <div class="tiny faint">Applied ${agoText(a.at)}</div></div>
         ${full ? `<div style="padding:0 18px"><div class="banner full">${ic("check", 18)}<span><b>Fully booked.</b> To book ${esc(u.name.split(" ")[0])}, cancel a booking first.</span></div></div>` : ""}
         <div class="actions"><button class="btn bad sm" data-a="decide" data-id="${a.id}" data-to="decline">Pass</button>
           <button class="btn line sm" data-a="decide" data-id="${a.id}" data-to="shortlist" ${a.status === "shortlisted" ? "disabled" : ""}>${a.status === "shortlisted" ? "Shortlisted" : "Shortlist"}</button>
@@ -1144,13 +1188,14 @@ const screens = {
       return ({ "application.submitted": `${w} applied to ${g}`, "application.shortlisted": `You're shortlisted for ${g}`, "application.accepted": `You're booked for ${g}`,
         "application.declined": `${g} went to someone else this time`, "application.withdrawn": `${w} withdrew from ${g}`, "booking.cancelled": `${w} cancelled the booking for ${g}`,
         "opportunity.cancelled": `${g} was cancelled`, "post.liked": `${w} liked your post`, "post.commented": `${w} commented on your post`, "post.reposted": `${w} reposted your post`,
-        "user.followed": `${w} followed you`, "venue_booking.requested": `${w} wants to book <b>${esc(n.venueName)}</b> on ${n.date ? prettyDay(n.date) : "a date"}`,
-        "venue_booking.confirmed": `<b>${esc(n.venueName)}</b> confirmed your booking for ${n.date ? prettyDay(n.date) : "your date"}`,
-        "venue_booking.declined": `<b>${esc(n.venueName)}</b> can't host you on ${n.date ? prettyDay(n.date) : "that date"}`,
-        "venue_booking.cancelled": `${w} cancelled the booking at <b>${esc(n.venueName)}</b> for ${n.date ? prettyDay(n.date) : "a date"}` })[n.type] || esc(n.type.replace(/[._]/g, " ")); };
+        "user.followed": `${w} followed you`, "venue_booking.requested": `${w} wants to book <b>${esc(n.venueName)}</b> on ${whenN(n)}`,
+        "venue_booking.confirmed": `<b>${esc(n.venueName)}</b> confirmed your booking for ${whenN(n)}`,
+        "venue_booking.declined": `<b>${esc(n.venueName)}</b> can't host you on ${whenN(n)}`,
+        "venue_booking.cancelled": `${w} cancelled the booking at <b>${esc(n.venueName)}</b> for ${whenN(n)}` })[n.type] || esc(n.type.replace(/[._]/g, " ")); };
+    const whenN = (n) => n.starts ? `${prettyDay(istDayOf(n.starts))}, ${slotLabel(n.starts, n.ends)}` : n.date ? prettyDay(n.date) : "a date";
     const actionFor = (n) => ({ "application.submitted": "Review", "application.accepted": "Details", "application.shortlisted": "View", "user.followed": "View", "venue_booking.requested": "Review", "venue_booking.confirmed": "View" })[n.type] || "";
     const group = (title, items) => items.length ? `<section class="section" style="gap:0"><span class="eyebrow" style="margin-bottom:4px">${title}</span>${items.map((n) => `<button class="list-row" data-a="notif" data-id="${n.id}" style="align-items:flex-start">
-      ${av(n.actor || "eq", "sm")}<span class="grow small" style="color:${n.read ? "var(--ink-2)" : "var(--ink)"}">${text(n)}<span class="tiny faint" style="display:block">${ago2(n.at)} ago</span></span>
+      ${av(n.actor || "eq", "sm")}<span class="grow small" style="color:${n.read ? "var(--ink-2)" : "var(--ink)"}">${text(n)}<span class="tiny faint" style="display:block">${agoText(n.at)}</span></span>
       ${actionFor(n) ? `<span class="btn sm ${n.read ? "line" : "pink"}" style="height:32px">${actionFor(n)}</span>` : n.read ? "" : `<span class="dot" style="margin-top:6px"></span>`}</button>`).join("")}</section>` : "";
     const today = list.filter((n) => Date.now() - new Date(n.at) < DAY), earlier = list.filter((n) => !today.includes(n));
     return bar("Notifications", list.some((n) => !n.read) ? `<button class="btn sm line" data-a="readall">Mark all read</button>` : "") +
@@ -1253,8 +1298,8 @@ const composeSheet = () => `<span class="eyebrow">New post</span><textarea id="c
   <span class="tiny muted">Up to 4 files. Videos up to ${MAX_VIDEO_MB} MB.</span>
   <div class="row"><button class="btn line grow" data-a="closesheet">Cancel</button><button class="btn pink grow" data-a="publish">Post</button></div>`;
 function venueReqSheet(id) {
-  const v = S.venues[id], date = ui.cal?.sel;
-  return `<div class="col" style="gap:2px"><span class="eyebrow">Booking request</span><b style="font-size:18px">${esc(v.name)} · ${prettyDay(date)}</b>
+  const v = S.venues[id], date = ui.cal?.sel, pick = chosenSlot(date, ui.cal.start, ui.cal.end);
+  return `<div class="col" style="gap:2px"><span class="eyebrow">Booking request</span><b style="font-size:18px">${esc(v.name)} · ${prettyDay(date)}, ${slotLabel(pick.starts_at, pick.ends_at)}</b>
       <span class="tiny muted">${esc(nm(v.managers[0]))} confirms or declines. You'll get a notification either way.</span></div>
     <div id="vreq-err"></div>
     <div class="field"><label for="vr-msg">About your event</label><textarea id="vr-msg" class="textarea" maxlength="1000" placeholder="What's the night? Timings, sound needs, ticketed or free."></textarea></div>
@@ -1289,7 +1334,7 @@ function render(top = false) {
     ${sheet ? `<div class="backdrop" data-a="closesheet"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grabber"></div>${sheet}</div>` : ""}
     ${ui.lightbox ? `<div class="lightbox" data-a="closelightbox" role="dialog" aria-label="Photo"><img src="${esc(ui.lightbox)}" alt=""></div>` : ""}
     ${ui.toast ? `<div class="toast ${ui.toast.bad ? "bad" : ""}" role="status">${ui.toast.bad ? ic("x", 18) : ic("check", 18)}<span>${esc(ui.toast.text)}</span></div>` : ""}`;
-  for (const [id, v] of Object.entries(keepVals)) { const el = document.getElementById(id); if (el && !el.disabled) { if (el.type === "checkbox") el.checked = v; else if (el.value !== v && id !== "q") el.value = v; } }
+  for (const [id, v] of Object.entries(keepVals)) { const el = document.getElementById(id); if (el && !el.disabled) { if (el.type === "checkbox") el.checked = v; else if (el.value !== v && id !== "q" && !id.startsWith("sl-")) el.value = v; } }
   if (focused) { const el = document.getElementById(focused); if (el) { el.focus(); try { if (selStart != null) el.setSelectionRange(selStart, selStart); } catch {} } }
   const sc = phone.querySelector(".scroll");
   sc.scrollTop = r.name === "thread" ? sc.scrollHeight : keep;
@@ -1380,12 +1425,14 @@ function act(a, id, el) {
     case "lightbox": ui.lightbox = id; render(); break;
     case "closelightbox": ui.lightbox = null; render(); break;
     case "venue": go("venue", { id }); break;
-    case "pickday": if (ui.cal?.venue !== cur().id) ui.cal = { venue: cur().id, off: 0, sel: null }; ui.cal.sel = ui.cal.sel === id ? null : id; render(); break;
+    case "pickday": if (ui.cal?.venue !== cur().id) ui.cal = { venue: cur().id, off: 0, sel: null };
+      ui.cal.sel = ui.cal.sel === id ? null : id; ui.cal.start ||= "18:00"; ui.cal.end ||= "23:00"; render(); break;
+    case "preset": [ui.cal.start, ui.cal.end] = id.split("|"); render(); break;
     case "calnav": if (ui.cal?.venue !== cur().id) ui.cal = { venue: cur().id, off: 0, sel: null }; ui.cal.off = Math.max(0, Math.min(2, ui.cal.off + Number(id))); render(); break;
     case "openvreq": if (need()) break; ui.sheet = { kind: "vreq", id }; render(); break;
     case "sendvreq": { const date = ui.cal.sel, n = Number(val("vr-n")) || null, message = val("vr-msg");
       ui.busy = true; renderBusy();
-      post(`/venues/${id}/bookings`, { date, message, expected_headcount: n })
+      post(`/venues/${id}/bookings`, { ...chosenSlot(date, ui.cal.start, ui.cal.end), message, expected_headcount: n })
         .then(async () => { await refresh(); await loadAvail(id); ui.busy = false; renderBusy(); ui.sheet = null; toast(`Request sent to ${S.venues[id].name}. You'll hear back here.`); })
         .catch((e) => { ui.busy = false; renderBusy(); errBox("vreq-err", e instanceof ApiErr ? e.text : "Couldn't send. Try again."); });
       break; }
@@ -1393,10 +1440,9 @@ function act(a, id, el) {
     case "vdecide": { const to = el.dataset.to, b = Object.values(S.venueBookings).flat().find((x) => x.id === id);
       run(async () => { await post(`/venue-bookings/${id}/${to}`); if (b) await loadAvail(b.venue); },
         to === "confirm" ? `Confirmed. ${b ? first(b.requester) : "They"} has been notified.` : "Declined. They've been notified."); break; }
-    case "block": { const vid = cur().id; run(async () => { await post(`/venues/${vid}/blocks`, { date: id }); await loadAvail(vid); }, `${prettyDay(id)} marked unavailable`); break; }
-    case "unblock": { const vid = cur().id, b = (S.venueBookings[vid] || []).find((x) => x.date === id && x.status === "blocked");
-      if (!b) { toast("Couldn't find that block. Pull to refresh.", true); break; }
-      run(async () => { await post(`/venue-bookings/${b.id}/cancel`); await loadAvail(vid); }, `${prettyDay(id)} is open again`); break; }
+    case "block": { const vid = cur().id, slot = chosenSlot(ui.cal.sel, ui.cal.start, ui.cal.end);
+      run(async () => { await post(`/venues/${vid}/blocks`, slot); await loadAvail(vid); }, `${slotLabel(slot.starts_at, slot.ends_at)} marked unavailable`); break; }
+    case "unblock": { const vid = cur().id; run(async () => { await post(`/venue-bookings/${id}/cancel`); await loadAvail(vid); }, "That time is open again"); break; }
     case "venueform": if (need()) break; ui.vform = null; go("venueform", { id: id || null }); break;
     case "savevenue": { const f = ui.vform; f.listed = document.getElementById("vf-listed").checked;
       if (!f.name.trim()) { errBox("vf-err", "Give your venue a name."); break; }
@@ -1470,6 +1516,7 @@ document.addEventListener("keydown", (e) => {
 });
 document.addEventListener("change", (e) => {
   if (e.target.classList?.contains("pf-genre")) e.target.closest(".chip").classList.toggle("on", e.target.checked);
+  if (e.target.dataset?.slot && ui.cal) { ui.cal[e.target.dataset.slot] = e.target.value; render(); }
   if (e.target.id === "cfile") { addFiles(ui.compose, e.target.files, 4); e.target.value = ""; render(); }
   if (e.target.id === "vf-file") { addFiles(ui.vform.files, [...e.target.files].filter((f) => f.type.startsWith("image/")), 8 - ui.vform.photos.length); e.target.value = ""; render(); }
   onDraft(e);

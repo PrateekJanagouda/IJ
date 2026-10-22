@@ -2541,26 +2541,30 @@ components:
         end:
           type: string
           format: date
-        days:
+        slots:
           type: array
           items:
-            $ref: '#/components/schemas/AvailabilityDay'
+            $ref: '#/components/schemas/AvailabilitySlot'
       required:
-      - days
       - end
+      - slots
       - start
-    AvailabilityDay:
+    AvailabilitySlot:
       type: object
       properties:
-        date:
+        starts_at:
           type: string
-          format: date
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
         status:
-          $ref: '#/components/schemas/AvailabilityDayStatusEnum'
+          $ref: '#/components/schemas/AvailabilitySlotStatusEnum'
       required:
-      - date
+      - ends_at
+      - starts_at
       - status
-    AvailabilityDayStatusEnum:
+    AvailabilitySlotStatusEnum:
       enum:
       - booked
       - blocked
@@ -4718,15 +4722,19 @@ components:
     VenueBlockInputRequest:
       type: object
       properties:
-        date:
+        starts_at:
           type: string
-          format: date
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
         message:
           type: string
           default: ''
           maxLength: 1000
       required:
-      - date
+      - ends_at
+      - starts_at
     VenueBooking:
       type: object
       properties:
@@ -4745,6 +4753,14 @@ components:
         date:
           type: string
           format: date
+          readOnly: true
+        starts_at:
+          type: string
+          format: date-time
+          readOnly: true
+        ends_at:
+          type: string
+          format: date-time
           readOnly: true
         status:
           allOf:
@@ -4771,18 +4787,25 @@ components:
       - created_at
       - date
       - decided_at
+      - ends_at
       - expected_headcount
       - id
       - message
       - requester
+      - starts_at
       - status
       - venue
     VenueBookingInputRequest:
       type: object
+      description: Send times with an offset, e.g. 2026-10-24T20:00:00+05:30. Slots
+        may cross midnight.
       properties:
-        date:
+        starts_at:
           type: string
-          format: date
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
         message:
           type: string
           default: ''
@@ -4793,7 +4816,8 @@ components:
           minimum: 1
           nullable: true
       required:
-      - date
+      - ends_at
+      - starts_at
     VenueBookingStatus:
       enum:
       - requested

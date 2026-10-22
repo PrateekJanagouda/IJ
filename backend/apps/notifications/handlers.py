@@ -139,7 +139,8 @@ def on_user_followed(p):
 
 
 def _venue_payload(p):
-    return {"venue_id": p["venue_id"], "venue_name": p["venue_name"], "date": p["date"]}
+    return {"venue_id": p["venue_id"], "venue_name": p["venue_name"], "date": p["date"],
+            "starts_at": p.get("starts_at"), "ends_at": p.get("ends_at")}
 
 
 def on_venue_booking_requested(p):

@@ -1,6 +1,7 @@
 """Profiles domain: profile visibility, editing, portfolio, venues."""
 
-from datetime import timedelta
+from datetime import datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from django.db import IntegrityError, transaction
 from django.db.models import Q
@@ -212,75 +213,117 @@ def add_venue_manager(actor, venue, user):
 
 
 # --- Venue bookings ---------------------------------------------------------
+#
+# A booking is a time slot [starts_at, ends_at). Slots may cross midnight (8pm-1am) and
+# several can share a day as long as they don't overlap. The exclusion constraint on
+# VenueBooking is the guarantee; these checks exist to return friendly errors first.
+
+VENUE_TZ = ZoneInfo("Asia/Kolkata")  # every venue is in India for now
+MIN_SLOT = timedelta(minutes=30)
+MAX_SLOT = timedelta(hours=24)
 
 
-def _manager_ids(venue):
-    return [str(i) for i in venue.memberships.values_list("user_id", flat=True)]
+def _local(dt):
+    return dt.astimezone(VENUE_TZ)
 
 
-def _check_bookable_date(date):
-    today = timezone.localdate()
-    if date < today:
-        raise ValidationFailed("Pick a date from today onwards.",
-                               details={"fields": {"date": ["That date has passed."]}})
-    if date > today + timedelta(days=BOOKING_HORIZON_DAYS):
+def _slot_label(b):
+    def t(dt):
+        dt = _local(dt)
+        return dt.strftime("%-I%p" if dt.minute == 0 else "%-I:%M%p").lower()
+    return f"{t(b.starts_at)}-{t(b.ends_at)}"
+
+
+def _check_slot(starts_at, ends_at):
+    if ends_at <= starts_at:
+        raise ValidationFailed("The end time must be after the start time.",
+                               details={"fields": {"ends_at": ["Must be after the start."]}})
+    if not MIN_SLOT <= ends_at - starts_at <= MAX_SLOT:
+        raise ValidationFailed("A slot can be 30 minutes to 24 hours long.",
+                               details={"fields": {"ends_at": ["30 min to 24 h."]}})
+    now = timezone.now()
+    if starts_at < now:
+        raise ValidationFailed("Pick a time that hasn't passed yet.",
+                               details={"fields": {"starts_at": ["That time has passed."]}})
+    if starts_at > now + timedelta(days=BOOKING_HORIZON_DAYS):
         raise ValidationFailed("Bookings open up to a year ahead.",
-                               details={"fields": {"date": ["Too far ahead."]}})
+                               details={"fields": {"starts_at": ["Too far ahead."]}})
 
 
-def _date_taken(venue, date, exclude_id=None):
-    qs = VenueBooking.objects.filter(venue=venue, date=date, status__in=VenueBooking.TAKEN)
+def _overlapping(venue_id, starts_at, ends_at):
+    """Bookings at the venue whose [start, end) overlaps the given slot."""
+    return VenueBooking.objects.filter(venue_id=venue_id, starts_at__lt=ends_at,
+                                       ends_at__gt=starts_at)
+
+
+def _taken_clash(venue_id, starts_at, ends_at, exclude_id=None):
+    qs = _overlapping(venue_id, starts_at, ends_at).filter(status__in=VenueBooking.TAKEN)
     if exclude_id:
         qs = qs.exclude(id=exclude_id)
-    return qs.exists()
+    return qs.order_by("starts_at").first()
+
+
+def _clash_error(clash):
+    when = _local(clash.starts_at).strftime("%a %-d %b")
+    return Conflict(f"That overlaps a booking on {when}, {_slot_label(clash)}. Pick another time.",
+                    code="slot_unavailable")
 
 
 def _event(booking, event, **extra):
     outbox.publish(f"venue_booking.{event}", {
         "booking_id": str(booking.id), "venue_id": str(booking.venue_id),
         "venue_name": booking.venue.name, "date": booking.date.isoformat(),
+        "starts_at": booking.starts_at.isoformat(), "ends_at": booking.ends_at.isoformat(),
         "requester_id": str(booking.requester_id), "manager_ids": _manager_ids(booking.venue),
         **extra,
     })
 
 
+def _manager_ids(venue):
+    return [str(i) for i in venue.memberships.values_list("user_id", flat=True)]
+
+
 def availability(viewer, venue, start, days):
-    """Dates in [start, start+days) that are not simply free. The public sees taken dates;
+    """Slots in the window that aren't free. Everyone sees taken (booked/blocked) slots;
     a requester also sees their own open requests; managers see where requests wait."""
-    end = start + timedelta(days=days - 1)
+    window_start = datetime.combine(start, time.min, VENUE_TZ)
+    window_end = window_start + timedelta(days=days)
     manager = is_venue_manager(viewer, venue.id)
     viewer_id = viewer.id if viewer is not None and viewer.is_authenticated else None
-    marks = {}
-    rows = venue.bookings.filter(date__range=(start, end)).exclude(
-        status__in=[VenueBooking.Status.DECLINED, VenueBooking.Status.CANCELLED])
+    slots = []
+    rows = _overlapping(venue.id, window_start, window_end).exclude(
+        status__in=[VenueBooking.Status.DECLINED, VenueBooking.Status.CANCELLED]
+    ).order_by("starts_at")
     for b in rows:
         if b.status in VenueBooking.TAKEN:
-            marks[b.date] = "booked" if b.status == VenueBooking.Status.CONFIRMED else "blocked"
+            status = "booked" if b.status == VenueBooking.Status.CONFIRMED else "blocked"
         elif b.requester_id == viewer_id:
-            marks.setdefault(b.date, "requested_by_you")
+            status = "requested_by_you"
         elif manager:
-            marks.setdefault(b.date, "has_requests")
-    return {"start": start, "end": end,
-            "days": [{"date": d, "status": marks[d]} for d in sorted(marks)]}
+            status = "has_requests"
+        else:
+            continue
+        slots.append({"starts_at": b.starts_at, "ends_at": b.ends_at, "status": status})
+    return {"start": start, "end": start + timedelta(days=days - 1), "slots": slots}
 
 
 @transaction.atomic
-def request_booking(actor, venue, *, date, message="", expected_headcount=None):
+def request_booking(actor, venue, *, starts_at, ends_at, message="", expected_headcount=None):
     if not venue.is_listed:
         raise NotFound("Venue not found.")
     if is_venue_manager(actor, venue.id):
-        raise Conflict("You manage this venue. Block the date instead.", code="own_venue")
-    _check_bookable_date(date)
-    if _date_taken(venue, date):
-        raise Conflict("That date is already booked. Pick another day.", code="date_unavailable")
+        raise Conflict("You manage this venue. Block the time instead.", code="own_venue")
+    _check_slot(starts_at, ends_at)
+    if clash := _taken_clash(venue.id, starts_at, ends_at):
+        raise _clash_error(clash)
     try:
         with transaction.atomic():
             booking = VenueBooking.objects.create(
-                venue=venue, requester=actor, date=date, message=message.strip(),
-                expected_headcount=expected_headcount,
+                venue=venue, requester=actor, date=_local(starts_at).date(), starts_at=starts_at,
+                ends_at=ends_at, message=message.strip(), expected_headcount=expected_headcount,
             )
     except IntegrityError as exc:
-        raise Conflict("You already asked for this date.", code="already_requested") from exc
+        raise Conflict("You already asked for this slot.", code="already_requested") from exc
     audit.record(actor=actor, action="venue_booking.requested", resource=booking)
     _event(booking, "requested")
     return booking
@@ -301,21 +344,22 @@ def _locked_booking(booking_id):
     return VenueBooking.objects.select_for_update().select_related("venue").get(id=booking_id)
 
 
-def _take_date(actor, booking, status):
-    """Confirm or block `booking`'s date. The caller holds the venue lock; the unique
-    constraint backs it up. Competing open requests for that day are declined."""
-    if _date_taken(booking.venue, booking.date, exclude_id=booking.id):
-        raise Conflict("That date is already booked.", code="date_unavailable")
+def _take_slot(actor, booking, status):
+    """Confirm or block `booking`'s slot. The caller holds the venue lock; the exclusion
+    constraint backs it up. Open requests that overlap the slot are declined."""
+    if clash := _taken_clash(booking.venue_id, booking.starts_at, booking.ends_at,
+                             exclude_id=booking.id):
+        raise _clash_error(clash)
     booking.status, booking.decided_by, booking.decided_at = status, actor, timezone.now()
     try:
         with transaction.atomic():
             booking.save()
     except IntegrityError as exc:
-        raise Conflict("That date is already booked.", code="date_unavailable") from exc
-    losers = VenueBooking.objects.select_for_update().filter(
-        venue_id=booking.venue_id, date=booking.date, status=VenueBooking.Status.REQUESTED,
-    ).exclude(id=booking.id).select_related("venue")
-    for other in losers:
+        raise Conflict("That time was just booked. Pick another slot.",
+                       code="slot_unavailable") from exc
+    losers = _overlapping(booking.venue_id, booking.starts_at, booking.ends_at).filter(
+        status=VenueBooking.Status.REQUESTED).exclude(id=booking.id).select_related("venue")
+    for other in losers.select_for_update():
         other.status, other.decided_by, other.decided_at = (
             VenueBooking.Status.DECLINED, actor, timezone.now())
         other.save()
@@ -330,8 +374,9 @@ def decide_booking(actor, booking_id, to):
     if booking.status != VenueBooking.Status.REQUESTED:
         raise Conflict(f"This request is already {booking.status}.", code="invalid_transition")
     if to == VenueBooking.Status.CONFIRMED:
-        _check_bookable_date(booking.date)
-        _take_date(actor, booking, VenueBooking.Status.CONFIRMED)
+        if booking.starts_at < timezone.now():
+            raise Conflict("This slot has already started.", code="slot_passed")
+        _take_slot(actor, booking, VenueBooking.Status.CONFIRMED)
     else:
         booking.status, booking.decided_by, booking.decided_at = to, actor, timezone.now()
         booking.save()
@@ -362,13 +407,14 @@ def cancel_booking(actor, booking_id):
 
 
 @transaction.atomic
-def block_date(actor, venue, *, date, message=""):
+def block_slot(actor, venue, *, starts_at, ends_at, message=""):
     if not is_venue_manager(actor, venue.id):
         raise Forbidden()
-    _check_bookable_date(date)
+    _check_slot(starts_at, ends_at)
     _lock_venue(venue.id)
-    booking = VenueBooking(venue=venue, requester=actor, date=date, message=message.strip())
-    _take_date(actor, booking, VenueBooking.Status.BLOCKED)
+    booking = VenueBooking(venue=venue, requester=actor, date=_local(starts_at).date(),
+                           starts_at=starts_at, ends_at=ends_at, message=message.strip())
+    _take_slot(actor, booking, VenueBooking.Status.BLOCKED)
     audit.record(actor=actor, action="venue_booking.blocked", resource=booking)
     return booking
 
@@ -376,11 +422,11 @@ def block_date(actor, venue, *, date, message=""):
 def venue_bookings_for_manager(actor, venue):
     if not is_venue_manager(actor, venue.id):
         raise Forbidden()
-    since = timezone.localdate() - timedelta(days=30)
-    return (venue.bookings.filter(date__gte=since).select_related("venue", "requester__profile")
-            .order_by("date", "created_at"))
+    since = timezone.now() - timedelta(days=30)
+    return (venue.bookings.filter(ends_at__gte=since).select_related("venue", "requester__profile")
+            .order_by("starts_at", "created_at"))
 
 
 def my_venue_bookings(actor):
     return (VenueBooking.objects.filter(requester=actor).exclude(status=VenueBooking.Status.BLOCKED)
-            .select_related("venue", "requester__profile").order_by("-date"))
+            .select_related("venue", "requester__profile").order_by("-starts_at"))
